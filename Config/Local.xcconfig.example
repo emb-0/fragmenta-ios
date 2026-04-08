@@ -7,9 +7,9 @@ PRODUCT_BUNDLE_IDENTIFIER = com.yourcompany.fragmenta
 FRAGMENTA_SHARE_EXTENSION_BUNDLE_IDENTIFIER = com.yourcompany.fragmenta.share
 FRAGMENTA_APP_GROUP_IDENTIFIER = group.com.yourcompany.fragmenta.shared
 
-// Simulator example:
-FRAGMENTA_API_BASE_URL = http:$(FORWARD_SLASH)$(FORWARD_SLASH)127.0.0.1:3000
+// Default production backend:
+FRAGMENTA_API_BASE_URL = https:$(FORWARD_SLASH)$(FORWARD_SLASH)fragmenta-core.vercel.app
 
-// Device or production examples:
+// Optional local backend examples:
+// FRAGMENTA_API_BASE_URL = http:$(FORWARD_SLASH)$(FORWARD_SLASH)127.0.0.1:3000
 // FRAGMENTA_API_BASE_URL = http:$(FORWARD_SLASH)$(FORWARD_SLASH)192.168.1.25:3000
-// FRAGMENTA_API_BASE_URL = https:$(FORWARD_SLASH)$(FORWARD_SLASH)your-production-host.example.com

@@ -26,7 +26,7 @@ struct BackendDiagnosticsService: BackendDiagnosticsServiceProtocol {
             result = BackendHealthCheck(
                 status: .invalidConfiguration,
                 summary: issue,
-                detail: "Fragmenta is using a safe fallback URL until the configured base URL is corrected.",
+                detail: "Resolved backend target: \(config.apiBaseURL.absoluteString). Fragmenta is using a safe fallback URL until the configured base URL is corrected.",
                 checkedAt: .now,
                 primaryPath: "/api/health",
                 fallbackPath: nil
@@ -47,12 +47,11 @@ struct BackendDiagnosticsService: BackendDiagnosticsServiceProtocol {
     private func performReachabilityCheck() async -> BackendHealthCheck {
         do {
             let payload: BackendHealthPayload = try await apiClient.request(APIEndpoint(path: "/api/health"))
-            let statusDetail = payload.status ?? (payload.ok == true ? "ok" : nil)
 
             return BackendHealthCheck(
                 status: .healthy,
-                summary: "Health check succeeded against /api/health.",
-                detail: statusDetail,
+                summary: "\(config.backendEnvironment.title) responded successfully to /api/health.",
+                detail: healthCheckDetail(payload),
                 checkedAt: .now,
                 primaryPath: "/api/health",
                 fallbackPath: nil
@@ -69,8 +68,8 @@ struct BackendDiagnosticsService: BackendDiagnosticsServiceProtocol {
             let _: BackendStatsProbePayload = try await apiClient.request(APIEndpoint(path: "/api/stats/overview"))
             return BackendHealthCheck(
                 status: .reachableWithoutHealthEndpoint,
-                summary: "fragmenta-core is reachable, but /api/health is not implemented yet.",
-                detail: "The app successfully reached /api/stats/overview after /api/health returned \(primaryError.statusCode ?? 404).",
+                summary: "\(config.backendEnvironment.title) is reachable, but /api/health is not implemented there yet.",
+                detail: "Resolved backend target: \(config.apiBaseURL.absoluteString). The app successfully reached /api/stats/overview after /api/health returned \(primaryError.statusCode ?? 404).",
                 checkedAt: .now,
                 primaryPath: "/api/health",
                 fallbackPath: "/api/stats/overview"
@@ -106,7 +105,7 @@ struct BackendDiagnosticsService: BackendDiagnosticsServiceProtocol {
         return BackendHealthCheck(
             status: status,
             summary: apiError.message,
-            detail: apiError.details,
+            detail: failureDetail(for: apiError),
             checkedAt: .now,
             primaryPath: primaryPath,
             fallbackPath: fallbackPath
@@ -121,12 +120,46 @@ struct BackendDiagnosticsService: BackendDiagnosticsServiceProtocol {
             return false
         }
     }
+
+    private func healthCheckDetail(_ payload: BackendHealthPayload) -> String {
+        var details = ["Resolved backend target: \(config.apiBaseURL.absoluteString)."]
+
+        if let environment = payload.environment, environment.isBlank == false {
+            details.append("Environment: \(environment).")
+        }
+
+        if let version = payload.version, version.isBlank == false {
+            details.append("Version: \(version).")
+        }
+
+        if let statusDetail = payload.status ?? (payload.ok == true ? "ok" : nil), statusDetail.isBlank == false {
+            details.append("Status: \(statusDetail).")
+        }
+
+        if let message = payload.message, message.isBlank == false {
+            details.append(message)
+        }
+
+        return details.joined(separator: " ")
+    }
+
+    private func failureDetail(for apiError: APIError) -> String? {
+        var details = ["Resolved backend target: \(config.apiBaseURL.absoluteString)."]
+
+        if let apiErrorDetail = apiError.details, apiErrorDetail.isBlank == false {
+            details.append(apiErrorDetail)
+        }
+
+        return details.joined(separator: " ")
+    }
 }
 
 private struct BackendHealthPayload: Decodable, Sendable {
     let ok: Bool?
     let status: String?
     let message: String?
+    let environment: String?
+    let version: String?
 }
 
 private struct BackendStatsProbePayload: Decodable, Sendable {

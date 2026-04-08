@@ -2,15 +2,14 @@
 
 Fragmenta iOS is the native SwiftUI client for `fragmenta-core`, the separate backend that ingests Kindle exports into books, highlights, notes, collections, insights, exports, discovery surfaces, and share artifacts.
 
-Sprint 1 through Sprint 7 are complete. Sprint 8 is the device-first runtime overhaul: make the app feel correctly scaled on iPhone, make the tab shell behave like a native app, tighten backend reachability and diagnostics, and document the runtime truth before Sprint 9 feature work.
+Sprint 1 through Sprint 8 are complete. Sprint 9 makes the production Vercel backend the default runtime path so the app can be tested immediately on Simulator and physical iPhone without pointing at localhost first.
 
-## Sprint 8 focus
+## Sprint 9 focus
 
-- fix the underscaled, preview-like phone layout
-- keep the premium visual language while reclaiming usable width on iPhone
-- keep native `TabView` navigation, but make the tab bar treatment and bottom-safe-area behavior more reliable
-- make backend failures diagnosable instead of collapsing them into generic connection copy
-- reconcile the client with the backend routes and query semantics actually present in the local `fragmenta-core` checkout
+- make `https://fragmenta-core.vercel.app` the bundled Debug and Release default
+- keep local Mac mini backend testing available only as an explicit override
+- show the resolved backend target clearly in Settings
+- keep `/api/health` probing visible so production reachability is obvious during runtime checks
 
 ## Current project shape
 
@@ -28,66 +27,80 @@ Sprint 1 through Sprint 7 are complete. Sprint 8 is the device-first runtime ove
 
 ## Quick start on this Mac
 
-1. Create a local config:
-
-```sh
-cp Config/Local.xcconfig.example Config/Local.xcconfig
-```
-
-2. Set the local values listed below.
-3. Regenerate the Xcode project after any `project.yml` or source-layout change:
+1. Regenerate the Xcode project after any `project.yml` or source-layout change:
 
 ```sh
 xcodegen generate
 ```
 
-4. Open `Fragmenta.xcodeproj` in Xcode.
-5. In Xcode, confirm signing for both targets:
+2. Open `Fragmenta.xcodeproj` in Xcode.
+3. In Xcode, confirm signing for both targets:
    - `Fragmenta`
    - `FragmentaShareExtension`
-6. In Signing & Capabilities for both targets, verify:
+4. In Signing & Capabilities for both targets, verify:
    - the Team matches `DEVELOPMENT_TEAM`
    - the bundle identifiers match your local config
    - App Groups is enabled on both targets
    - both targets use the exact same App Group identifier
-7. Build `Fragmenta`.
-8. Launch the app.
-9. Run the runtime checklist below on Simulator and, if needed, on a real device.
+5. Build `Fragmenta`.
+6. Launch the app.
+7. Open Settings and confirm the backend target reads `Production backend`.
+8. Run the backend check.
+
+## Default production testing setup
+
+The bundled default is now production in both tracked configs:
+
+- `Config/Debug.xcconfig`
+- `Config/Release.xcconfig`
+
+Both now set:
+
+- `FRAGMENTA_API_BASE_URL = https:$(FORWARD_SLASH)$(FORWARD_SLASH)fragmenta-core.vercel.app`
+
+You only need `Config/Local.xcconfig` if you want machine-local overrides such as signing values, bundle IDs, App Group values, or a temporary local/LAN backend.
+
+Create it only when needed:
+
+```sh
+cp Config/Local.xcconfig.example Config/Local.xcconfig
+```
 
 ## Required xcconfig values
 
-Set these values in `Config/Local.xcconfig`:
+If you do create `Config/Local.xcconfig` on this Mac mini, use:
 
 - `DEVELOPMENT_TEAM = YOURTEAMID`
 - `PRODUCT_BUNDLE_IDENTIFIER = com.yourcompany.fragmenta`
 - `FRAGMENTA_SHARE_EXTENSION_BUNDLE_IDENTIFIER = com.yourcompany.fragmenta.share`
 - `FRAGMENTA_APP_GROUP_IDENTIFIER = group.com.yourcompany.fragmenta.shared`
-- `FRAGMENTA_API_BASE_URL = http:$(FORWARD_SLASH)$(FORWARD_SLASH)127.0.0.1:3000`
+- `FRAGMENTA_API_BASE_URL = https:$(FORWARD_SLASH)$(FORWARD_SLASH)fragmenta-core.vercel.app`
 
 Important notes:
 
-- `Config/Debug.xcconfig` defaults to `127.0.0.1:3000`.
-- `Config/Release.xcconfig` still points at an example production host and should be overridden for real release-style testing.
+- `Config/Debug.xcconfig` now defaults to the Vercel production backend.
+- `Config/Release.xcconfig` also defaults to the same production backend.
 - `Config/Local.xcconfig` is included last, so your local machine values win cleanly.
-- in `.xcconfig`, keep the `http:$(FORWARD_SLASH)$(FORWARD_SLASH)...` style; raw `//` can be mangled by Xcode build setting expansion
+- in `.xcconfig`, keep the `http:$(FORWARD_SLASH)$(FORWARD_SLASH)...` or `https:$(FORWARD_SLASH)$(FORWARD_SLASH)...` style; raw `//` can be mangled by Xcode build setting expansion
 
 ## API base URL guidance
 
 Use `FRAGMENTA_API_BASE_URL` based on where `fragmenta-core` is running:
 
+- default Simulator or device path on this Mac:
+  `https:$(FORWARD_SLASH)$(FORWARD_SLASH)fragmenta-core.vercel.app`
 - iOS Simulator against a local backend on this Mac:
   `http:$(FORWARD_SLASH)$(FORWARD_SLASH)127.0.0.1:3000`
 - physical iPhone against a local backend on this Mac:
   `http:$(FORWARD_SLASH)$(FORWARD_SLASH)<mac-mini-lan-ip>:3000`
-- Simulator or device against a deployed backend:
-  `https:$(FORWARD_SLASH)$(FORWARD_SLASH)<your-production-host>`
 
 Runtime rules:
 
+- production is now the default bundled path for Debug and Release
 - `127.0.0.1` and `localhost` only work for the Simulator
 - a real iPhone cannot reach your Mac mini through `127.0.0.1`
-- for device testing, use the Mac mini LAN IP or a deployed production URL
-- Debug builds expose an in-app base URL override in Settings
+- for device testing against local backend, use the Mac mini LAN IP
+- Debug builds still expose an in-app base URL override in Settings
 - malformed overrides are now rejected with explicit validation instead of being silently accepted
 
 ## ATS and local networking
@@ -142,7 +155,7 @@ Navigation and bottom bar:
 
 Backend diagnostics:
 
-- Settings now shows the resolved backend URL, its source, and reachability guidance
+- Settings now shows the resolved backend URL, whether it is production or local, its source, and reachability guidance
 - invalid default or override URLs are surfaced as configuration issues
 - Debug override input now validates before applying
 - Settings can run a backend check from inside the app
@@ -171,54 +184,57 @@ Validated or tightened:
 
 Current backend caveats:
 
-- the checked `fragmenta-core` repo still does not expose a real `/api/health` route
+- the deployed production backend at `fragmenta-core.vercel.app` now exposes `/api/health`
+- the checked local `fragmenta-core` repo may still lag that production health route, so the stats fallback remains useful for local development
 - semantic search still depends on backend support; if the backend ignores `mode=semantic`, the UI still works but behaves like exact search
 - discovery cannot show real related highlights until the backend adds a dedicated route
 - the local collection-membership fallback is more network-chatty than a dedicated book-scoped endpoint
 
-## Runtime validation completed in Sprint 8
+## Runtime validation completed in Sprint 9
 
 Validated in this environment:
 
 - `git fetch origin --prune`
+- `xcodebuild -project Fragmenta.xcodeproj -scheme Fragmenta -configuration Debug -showBuildSettings`
+- confirmed `FRAGMENTA_API_BASE_URL = https://fragmenta-core.vercel.app` in Debug build settings
 - `xcodegen generate`
 - app build:
 
 ```sh
-xcodebuild -project Fragmenta.xcodeproj -scheme Fragmenta -configuration Debug -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/fragmenta-ios-sprint8-build CODE_SIGNING_ALLOWED=NO build
+xcodebuild -project Fragmenta.xcodeproj -scheme Fragmenta -configuration Debug -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/fragmenta-ios-sprint9-build CODE_SIGNING_ALLOWED=NO build
 ```
 
 - result: `** BUILD SUCCEEDED **`
-- the embedded share extension also built as part of the app target
-- booted Simulator device: `iPhone 16e`
-- successful app install + launch command:
-
-```sh
-xcrun simctl install 97B7595A-C7B4-4B04-A2E2-E61BB4964BE0 /tmp/fragmenta-ios-sprint8-build/Build/Products/Debug-iphonesimulator/Fragmenta.app
-xcrun simctl launch 97B7595A-C7B4-4B04-A2E2-E61BB4964BE0 com.fragmenta.ios
-```
+- production backend probe:
+  `curl -sS -D - https://fragmenta-core.vercel.app/api/health`
+- production health result: `HTTP/2 200` with `{"ok":true,"environment":"production","version":"6887a4f"}`
+- simulator launch:
+  `xcrun simctl launch 97B7595A-C7B4-4B04-A2E2-E61BB4964BE0 com.fragmenta.ios`
+- simulator launch result: `com.fragmenta.ios: 42455`
 
 Runtime constraints observed during validation:
 
-- local backend at `http://127.0.0.1:3000` was not running on this Mac during Sprint 8 validation
-- CoreSimulator screenshot capture failed with `SimDisplayScreenshotWriter.ScreenshotError code=2`, so no screenshot-based visual proof is claimed here
-- after the successful launch command, later `simctl` screenshot/query calls were unstable enough that they should be treated as simulator tooling noise, not app proof either way
+- this Sprint 9 pass validates production-default config and production endpoint reachability, not deeper UI runtime behavior
+- no new simulator screenshot or real-device proof is claimed here
 
 What is honestly claimed:
 
+- the bundled default Debug and Release URL is now the production Vercel backend
+- Debug build settings resolve that URL correctly
 - project generation succeeded
 - the app compiles for the iOS Simulator
-- the app install/launch command succeeded once on the iPhone 16e simulator
+- the production backend endpoint was probed directly from this Mac and returned a healthy production response
+- the production-default build installed and launched on the iPhone 16e simulator
 
 What is not claimed:
 
 - no share-extension ingest runtime validation
-- no real device validation from this Sprint 8 pass
-- no backend-connected data-path validation on this machine while `fragmenta-core` was down
+- no real device validation from this Sprint 9 pass
+- no end-to-end in-app production data walkthrough was claimed from this config-only sprint
 
 ## Tonight's runtime checklist
 
-After setting the local team, bundle IDs, App Group, and real backend URL:
+After setting the local team, bundle IDs, and App Group:
 
 1. Build `Fragmenta`.
 2. Launch the app on Simulator.

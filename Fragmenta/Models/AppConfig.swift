@@ -15,6 +15,26 @@ struct AppConfig: Hashable, Sendable {
         }
     }
 
+    enum BackendEnvironment: Hashable, Sendable {
+        case production
+        case simulatorLocalhost
+        case localNetwork
+        case customRemote
+
+        var title: String {
+            switch self {
+            case .production:
+                return "Production backend"
+            case .simulatorLocalhost:
+                return "Simulator localhost"
+            case .localNetwork:
+                return "Local network backend"
+            case .customRemote:
+                return "Custom remote backend"
+            }
+        }
+    }
+
     let apiBaseURL: URL
     let defaultAPIBaseURL: URL
     let apiBaseURLSource: APIBaseURLSource
@@ -91,17 +111,34 @@ struct AppConfig: Hashable, Sendable {
     }
 
     var baseURLConnectivityGuidance: String {
+        switch backendEnvironment {
+        case .production:
+            return "Fragmenta is pointed at the deployed production backend. This is the default path for Simulator and physical iPhone testing on this Mac mini."
+        case .simulatorLocalhost:
+            return "Use \(apiBaseURL.host?.lowercased() ?? "localhost") only for Simulator testing on this Mac mini. A physical iPhone cannot reach the Mac through localhost or 127.0.0.1."
+        case .localNetwork:
+            return "Plain HTTP is configured for a LAN backend. This is fine for local testing if the phone and Mac mini are on the same network and fragmenta-core is running at this host."
+        case .customRemote:
+            return "Fragmenta is pointed at a custom remote backend. This should work on Simulator and physical iPhone as long as the deployed host is reachable from the current network."
+        }
+    }
+
+    var backendEnvironment: BackendEnvironment {
         let host = apiBaseURL.host?.lowercased() ?? ""
 
         if host == "127.0.0.1" || host == "localhost" {
-            return "Use \(host) only for Simulator testing on this Mac mini. A physical iPhone cannot reach the Mac through localhost or 127.0.0.1."
+            return .simulatorLocalhost
         }
 
         if apiBaseURL.scheme?.lowercased() == "http" {
-            return "Plain HTTP is configured. This is fine for local LAN testing if the phone and Mac mini are on the same network and fragmenta-core is running at this host."
+            return .localNetwork
         }
 
-        return "This URL is suitable for Simulator and device testing as long as the deployed backend is reachable from the current network."
+        if host == "fragmenta-core.vercel.app" {
+            return .production
+        }
+
+        return .customRemote
     }
 
     private static func resolveBaseURL(from rawValue: String) -> BaseURLResolution {

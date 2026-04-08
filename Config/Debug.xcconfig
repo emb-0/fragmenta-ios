@@ -1,5 +1,5 @@
 #include "Base.xcconfig"
 
-FRAGMENTA_API_BASE_URL = http:$(FORWARD_SLASH)$(FORWARD_SLASH)127.0.0.1:3000
+FRAGMENTA_API_BASE_URL = https:$(FORWARD_SLASH)$(FORWARD_SLASH)fragmenta-core.vercel.app
 
 #include? "Local.xcconfig"

@@ -84,7 +84,7 @@ struct SettingsView: View {
                 .font(FragmentaTypography.sectionTitle)
                 .foregroundStyle(FragmentaColor.textPrimary)
 
-            Text("Fragmenta currently speaks to fragmenta-core without auth. This section shows the resolved base URL, where it came from, and whether the app can actually reach the backend from the current runtime.")
+            Text("Fragmenta now defaults to the deployed production fragmenta-core backend on this Mac mini. This section shows the exact resolved URL, whether the app is targeting production or a local override, and whether /api/health responds from the current runtime.")
                 .font(FragmentaTypography.body)
                 .foregroundStyle(FragmentaColor.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -97,11 +97,17 @@ struct SettingsView: View {
                 )
             }
 
+            SettingsStatusCard(
+                title: config.backendEnvironment.title,
+                message: config.baseURLConnectivityGuidance,
+                detail: "Resolved backend target: \(config.apiBaseURL.absoluteString)"
+            )
+
+            LabeledSettingRow(label: "Target", value: config.backendEnvironment.title)
             LabeledSettingRow(label: "Resolved", value: config.apiBaseURL.absoluteString, monospaced: true)
             LabeledSettingRow(label: "Default", value: config.defaultAPIBaseURL.absoluteString, monospaced: true)
             LabeledSettingRow(label: "Source", value: config.apiBaseURLSource.title)
             LabeledSettingRow(label: "App Group", value: config.appGroupIdentifier ?? "Not configured", monospaced: true)
-            LabeledSettingRow(label: "Reachability note", value: config.baseURLConnectivityGuidance)
 
             backendHealthStatus
 
@@ -115,6 +121,11 @@ struct SettingsView: View {
                 Text("Development override")
                     .font(FragmentaTypography.metadata)
                     .foregroundStyle(FragmentaColor.textSecondary)
+
+                Text("Use this only when you intentionally want a localhost, LAN, or alternate deployed backend instead of the default production target.")
+                    .font(FragmentaTypography.metadata)
+                    .foregroundStyle(FragmentaColor.textTertiary)
+                    .fixedSize(horizontal: false, vertical: true)
 
                 TextField("Development base URL override", text: $viewModel.baseURLOverrideDraft)
                     .font(FragmentaTypography.monospacedMetadata)
@@ -245,7 +256,7 @@ struct SettingsView: View {
         } else {
             SettingsStatusCard(
                 title: "Backend check",
-                message: "Run the backend check to verify whether this device can reach fragmenta-core from the currently resolved base URL."
+                message: "Run the backend check to verify whether this device can reach \(config.backendEnvironment.title.lowercased()) through /api/health from the currently resolved base URL."
             )
         }
     }

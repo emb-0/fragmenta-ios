@@ -1,6 +1,6 @@
 # Fragmenta iOS
 
-Fragmenta iOS is the standalone native SwiftUI client for `fragmenta-core`, the separate Next.js backend that parses Kindle `.txt` exports into books, highlights, notes, imports, and exports.
+Fragmenta iOS is the standalone native SwiftUI client for `fragmenta-core`, the separate Next.js backend that parses Kindle `.txt` exports into books, highlights, notes, collections, insights, discovery surfaces, imports, and exports.
 
 This repository is intentionally:
 
@@ -10,176 +10,181 @@ This repository is intentionally:
 - not Expo
 - not a cross-platform scaffold
 
-Sprint 5 is a tight runtime-quality sprint. It keeps Sprint 4’s ingest and share foundations, then pushes the library toward a real native product surface with cover-rich browsing, image caching, faster perceived navigation, and better runtime readiness for tonight’s Xcode pass.
+Sprint 6 extends the already-connected app into a more complete product surface: reading insights, collections, backend share cards, AI-backed discovery, stronger cache behavior, and a tighter runtime-readiness pass for real Xcode validation.
 
-## Sprint 5 snapshot
+## Sprint 6 snapshot
 
-Sprint 5 adds:
+Sprint 6 adds:
 
-- a real cover-based bookshelf mode alongside the existing journal/list shelf
-- remembered library view mode preference
-- backend-cover enrichment decoding without introducing any direct Google Books client on iOS
-- a dedicated native cover image pipeline with downsampling, memory caching, URL caching, and prefetching
-- cover-aware list cards and a stronger cover-rich book detail header
-- a tighter reading screen with a notes-only highlight filter
-- small runtime-speed improvements for search and cover prefetching
-- clearer local cache messaging for cover art and shelf data
+- a new `Insights` tab with native reading stats surfaces
+- backend-driven collections and collection detail flows
+- book-to-collection membership management from book detail
+- backend share-card download and share flow for highlights
+- semantic search mode as a backend toggle
+- book-level discovery surfaces for AI summary and related highlights
+- broader file-backed caching plus an in-memory cache layer for faster repeat reads
+- deeper diagnostics coverage for insights, collections, discovery, and share cards
 
 ## Git state audit
 
-Sprint 5 started by verifying repository state before feature work.
+Sprint 6 started by verifying repository state before feature work.
 
 Verified at the start:
 
 - `git status --short --branch` showed `main...origin/main`
 - `git branch -vv` showed `main` tracking `origin/main`
 - `git remote -v` showed `origin` as `git@github.com:emb-0/fragmenta-ios.git`
-- `git log --oneline --decorate -6` showed the Sprint 4 commits on `main`
-- there were no pending local changes before Sprint 5 work began
+- the recent commit history showed Sprint 5 already on `main`
+- there were no pending local changes before Sprint 6 work began
 
-Sprint 5 ends the same way:
+Sprint 6 also ends on:
 
 - branch: `main`
 - upstream: `origin/main`
 - remote: `git@github.com:emb-0/fragmenta-ios.git`
 - push target: `origin main`
 
+Update this section with the final Sprint 6 commit hash after pushing if you want the README itself to be a permanent release ledger.
+
 ## Important tree changes
 
 ```text
 fragmenta-ios/
 ├── Fragmenta/
-│   ├── Core/
-│   │   └── Images/
 │   ├── Features/
+│   │   ├── Collections/
 │   │   ├── Highlights/
-│   │   └── Library/
+│   │   ├── Import/
+│   │   ├── Insights/
+│   │   ├── Library/
+│   │   ├── Search/
+│   │   └── Settings/
 │   ├── Models/
-│   └── Utilities/
+│   ├── Services/
+│   └── Core/
 ├── Config/
 ├── Fragmenta.xcodeproj
 └── README.md
 ```
 
-Key Sprint 5 additions:
+Key Sprint 6 additions:
 
-- `Fragmenta/Core/Images/CoverImagePipeline.swift`
-- `Fragmenta/Features/Library/BookCoverArtView.swift`
-- `Fragmenta/Features/Library/LibraryViewMode.swift`
+- `Fragmenta/Features/Insights/InsightsView.swift`
+- `Fragmenta/Features/Insights/InsightsViewModel.swift`
+- `Fragmenta/Features/Collections/CollectionsView.swift`
+- `Fragmenta/Features/Collections/CollectionsViewModel.swift`
+- `Fragmenta/Models/ReadingInsights.swift`
+- `Fragmenta/Models/Collection.swift`
+- `Fragmenta/Models/BookDiscovery.swift`
+- `Fragmenta/Models/ShareCardArtifact.swift`
+- `Fragmenta/Services/InsightsService.swift`
+- `Fragmenta/Services/CollectionsService.swift`
+- `Fragmenta/Services/DiscoveryService.swift`
+- `Fragmenta/Services/ShareCardService.swift`
 
-Key Sprint 5 updates:
+Key Sprint 6 updates:
 
-- `Fragmenta/Models/Book.swift`
-- `Fragmenta/Features/Library/LibraryView.swift`
-- `Fragmenta/Features/Library/LibraryViewModel.swift`
-- `Fragmenta/Features/Library/BookShelfCardView.swift`
+- `Fragmenta/App/RootView.swift`
+- `Fragmenta/Core/AppContainer.swift`
+- `Fragmenta/Core/AppState.swift`
+- `Fragmenta/Core/DiagnosticsStore.swift`
+- `Fragmenta/Core/FragmentaCacheStore.swift`
 - `Fragmenta/Features/Highlights/BookDetailView.swift`
 - `Fragmenta/Features/Highlights/BookDetailViewModel.swift`
-- `Fragmenta/Core/AppPreferencesStore.swift`
-- `Fragmenta/Core/AppState.swift`
+- `Fragmenta/Features/Highlights/HighlightCardView.swift`
+- `Fragmenta/Features/Import/ImportView.swift`
+- `Fragmenta/Features/Library/LibraryView.swift`
+- `Fragmenta/Features/Search/SearchView.swift`
+- `Fragmenta/Features/Search/SearchViewModel.swift`
+- `Fragmenta/Features/Search/SearchResultRowView.swift`
+- `Fragmenta/Features/Settings/SettingsView.swift`
+- `Fragmenta/Services/API/APIClient.swift`
+- `Fragmenta/Services/API/APIEndpoint.swift`
+- `Fragmenta/Services/SearchService.swift`
 
-## Sprint 5 implementation notes
+## Sprint 6 implementation notes
 
-### Bookshelf view
+### Insights
 
-The library now supports two modes:
+Sprint 6 adds a dedicated native `Insights` tab that consumes backend-owned stats rather than inventing a client analytics layer.
 
-- `Journal`
-- `Bookshelf`
+The screen now supports:
 
-`Journal` preserves the existing text-forward editorial shelf.
+- total books, highlights, and notes
+- pace summary cards
+- reading activity plotted over time
+- top annotated books
+- most annotated passages
+- cached-first loading with graceful saved-state fallback
 
-`Bookshelf` adds:
+The charts are intentionally restrained. The goal is a private reading ledger, not a loud dashboard.
 
-- cover-led browsing in a lazy grid
-- a smaller “Front shelf” strip for recent or prominent books
-- premium fallback covers when no remote cover exists
-- smooth tap-through into the existing book detail flow
+### Collections and tags
 
-The preferred view mode is persisted locally through `AppPreferencesStore`.
+Fragmenta now consumes backend collections as first-class organizational surfaces.
 
-### Backend cover enrichment assumptions
+The app includes:
 
-Fragmenta iOS does not call Google Books or any other third-party enrichment provider directly.
+- collection list screen
+- collection detail screen
+- tag display when the backend exposes tags
+- add/remove book membership flow from book detail
+- local caching for collection lists and collection detail payloads
 
-All enrichment is assumed to be backend-owned by `fragmenta-core`.
+The membership sheet assumes the backend can return a book-scoped collections response that includes membership state for the current book, rather than only returning collections the book already belongs to.
 
-The client now tolerates multiple backend cover shapes, including:
+### Share cards
 
-- nested `cover` objects
-- nested `enrichment.cover` objects
-- top-level fields such as:
-  - `cover_url`
-  - `cover_thumbnail_url`
-  - `cover_large_url`
-  - `cover_background_hex`
-  - `cover_foreground_hex`
-  - `cover_width`
-  - `cover_height`
+Sprint 6 adds highlight share-card handling through the backend.
 
-This keeps the iOS client flexible if `fragmenta-core` adjusts its enrichment payload slightly.
+The iOS client:
 
-### Cover image loading and caching
+- requests a backend-generated share card for a highlight
+- stores the returned image in the caches directory
+- reuses the cached file on repeated requests
+- presents the image through a native preview sheet
+- hands the image off through the native share sheet
 
-Sprint 5 adds a dedicated image pipeline instead of leaning on default `AsyncImage` behavior.
+This is intentionally backend-owned. Fragmenta iOS does not render its own quote card image pipeline.
 
-The cover stack now uses:
+### AI discovery
 
-- `NSCache` for in-memory cover reuse
-- `URLCache` through a dedicated `URLSession` for HTTP response caching
-- image downsampling before view rendering
-- request de-duplication for in-flight image fetches
-- eager prefetching of the most visible library covers
+Sprint 6 adds subtle AI-backed discovery surfaces without turning the app into an AI-first product.
 
-The goal is pragmatic runtime smoothness:
+The app now supports:
 
-- less janky scrolling
-- less re-decoding while browsing
-- more stable covers in repeated navigation
+- semantic search mode as a backend query mode
+- book-level summary surface
+- theme chips when the backend returns them
+- related highlights in book detail
+- graceful degradation when AI endpoints are empty or unavailable
 
-### Library runtime polish
+The iOS client does not create a second AI pipeline. It only consumes backend responses from `fragmenta-core`.
 
-Sprint 5 keeps the library tight:
+### Offline and cache behavior
 
-- fast view-mode switching
-- cover prefetching for the first visible shelf items
-- no extra metadata client or duplicate enrichment pipeline
-- preserved journal mode for users who want a text-first shelf
+Sprint 6 strengthens offline-friendly behavior without introducing full sync complexity.
 
-### Reading and detail polish
+The current cache strategy includes:
 
-The book detail screen now supports:
+- file-backed JSON caching in `Caches/FragmentaCache`
+- a new in-memory data cache layered into `FragmentaCacheStore`
+- cached library payloads
+- cached book detail and highlight pages
+- cached search result pages
+- cached reading insights
+- cached collection lists and collection detail payloads
+- cached discovery payloads
+- cached import history and last import response
+- persistent recent searches and diagnostics through `UserDefaults`
 
-- a cover-led hero when art is available
-- the same fallback cover language when it is not
-- a local `All Highlights` / `With Notes` filter
-- preserved copy/share/export actions from Sprint 4
-- a smoother first impression when book detail cover art is available
-
-### Search and settings refinements
-
-Sprint 5 includes a few small runtime wins:
-
-- slightly faster search debounce
-- clearer Settings messaging that cover art is part of the local cache
-- cache clearing now reflects the broader runtime state more honestly
-
-## Local persistence
-
-Fragmenta now uses these lightweight persistence layers:
-
-- `Caches/FragmentaCache` for library, book detail, import, and export payload caching
-- `UserDefaults` for recent searches, diagnostics, debug base URL override, and preferred library view mode
-- app-group-backed pending import draft storage for share-extension handoff
-- in-memory cover cache plus URL-backed cover response cache for artwork
-
-This remains intentionally lightweight. Sprint 5 is not an offline sync engine.
+This is still intentionally lightweight. Fragmenta is not doing offline conflict resolution or sync orchestration in Sprint 6.
 
 ## Backend assumptions
 
-Fragmenta still assumes a public backend with no auth in Sprint 5.
+Fragmenta still assumes a public backend with no auth in Sprint 6.
 
-Expected endpoints still include:
+Expected existing endpoints still include:
 
 - `GET /api/books`
 - `GET /api/books/{id}`
@@ -193,22 +198,36 @@ Expected endpoints still include:
 - `GET /api/exports/markdown`
 - `GET /api/exports/csv`
 
-Additional Sprint 5 assumptions:
+Sprint 6 adds these backend assumptions:
 
-- book payloads may now include backend-owned enrichment or cover metadata
-- thumbnail and larger cover URLs may both be present
-- the best bookshelf image may differ from the best detail image
+- `GET /api/insights/reading`
+- `GET /api/collections`
+- `GET /api/collections/{id}`
+- `GET /api/books/{id}/collections`
+- `POST /api/collections/{id}/books`
+- `DELETE /api/collections/{id}/books/{book_id}`
+- `GET /api/highlights/{id}/share-card`
+- `GET /api/books/{id}/summary`
+- `GET /api/books/{id}/related-highlights`
+- semantic search is represented as `GET /api/search?...&mode=semantic`
 
-Transport assumptions remain:
+Payload assumptions remain:
 
 - success responses use a `data` envelope
 - errors use an `error` object or string
 - payloads are `snake_case`
 - dates are ISO8601 strings
 
+Flexibility assumptions now built into the client:
+
+- stats payloads may use either nested totals/activity objects or flatter count/timeline fields
+- collections may expose tags as strings or tag objects
+- AI theme payloads may arrive as strings or richer objects
+- related highlights may arrive nested under `highlight` or as flatter highlight-shaped objects
+
 ## Config values
 
-No new required config values were added in Sprint 5.
+Sprint 6 does not add any new required config keys.
 
 You still need to set:
 
@@ -223,8 +242,8 @@ Current defaults in `Config/Base.xcconfig`:
 - `PRODUCT_BUNDLE_IDENTIFIER = com.fragmenta.ios`
 - `FRAGMENTA_SHARE_EXTENSION_BUNDLE_IDENTIFIER = com.fragmenta.ios.share`
 - `FRAGMENTA_APP_GROUP_IDENTIFIER = group.com.fragmenta.shared`
-- `MARKETING_VERSION = 0.5.0`
-- `CURRENT_PROJECT_VERSION = 5`
+- `MARKETING_VERSION = 0.6.0`
+- `CURRENT_PROJECT_VERSION = 6`
 
 Environment notes:
 
@@ -233,7 +252,7 @@ Environment notes:
 
 `127.0.0.1` is correct for an iOS simulator on the same Mac. It is not correct for a physical device.
 
-## Exact Xcode validation steps for tonight
+## Exact Xcode validation steps
 
 When you get back to Xcode:
 
@@ -251,26 +270,29 @@ When you get back to Xcode:
 6. Ensure the App Groups capability is applied to both targets with the same group identifier.
 7. Build the app target first.
 8. Validate these flows in order:
-   - launch and initial library load
-   - switch between `Journal` and `Bookshelf` modes
-   - bookshelf scrolling with many books
-   - cover loading, reuse, and fallback behavior
-   - navigation from both library modes into book detail
-   - book detail with and without cover art
-   - notes-only highlight filter in book detail
+   - app launch and initial tab shell
+   - library load in `Journal` and `Bookshelf`
+   - bookshelf scrolling with many covers
+   - transition from library into book detail
+   - insights load, chart rendering, and cached fallback behavior
+   - collections list and collection detail
+   - adding and removing a book from collections via the book detail sheet
+   - semantic search mode
    - search tap-through into focused highlight context
+   - book discovery summary and related highlights
+   - highlight copy/share/share-card flow
    - import via pasted text
    - import via document picker
-   - opening a `.txt` file into Fragmenta from Files
-   - book markdown export/share
-   - share-extension handoff from shared text or a shared `.txt` file
+   - open-from-Files ingestion
+   - share-extension handoff
+   - settings diagnostics and cache clear
 
 ## Validation completed here
 
 Completed in this environment:
 
-- git audit of local branch, upstream, remote, and recent commits
-- Sprint 5 source changes
+- git audit of local branch, upstream, remote, and recent state
+- Sprint 6 source changes
 - `xcodegen generate`
 - `plutil -lint Config/Info.plist`
 - `plutil -lint Config/ShareExtension-Info.plist`
@@ -282,27 +304,27 @@ Not completed here:
 - compiling against the iOS SDK in Xcode
 - simulator execution
 - device execution
-- runtime verification of the new cover pipeline
-- performance validation with a large real book set
-- direct Files/share-extension ingest validation on-device
-
-This machine still does not have Xcode installed, so those checks remain real follow-up work.
+- runtime validation of Charts rendering
+- runtime validation of collection membership mutations
+- runtime validation of share-card image generation and preview handoff
+- runtime validation of semantic search and book-discovery responses against the live backend
 
 ## What still needs real runtime or device verification
 
 - first compile across the app target and share-extension target
-- real-world cover loading behavior with backend-provided enrichment payloads
-- scroll smoothness in bookshelf mode with a larger library
-- cover cache reuse after navigating in and out of detail repeatedly
-- direct `.txt` open from Files into Fragmenta
-- share-extension handoff from other apps
-- share sheet presentation for exports
-- final spacing and behavior on real iPhone hardware
+- real backend compatibility for the new insights payload shape
+- real backend compatibility for collection membership responses
+- real backend compatibility for semantic search, book summaries, and related highlights
+- runtime behavior of highlight share-card downloads and preview/share handoff
+- chart performance and rendering polish on actual devices
+- collection membership sheet behavior against real data
+- direct Files/share-extension ingest on device
+- final scroll smoothness and tab/navigation feel on real hardware
 
-## Sprint 6 recommendations
+## Sprint 7 recommendations
 
-- validate and harden the cover payload contract against the real backend
-- refine bookshelf mode once real device performance is measured
-- add targeted tests around cover decoding and library view-mode persistence
-- tune any remaining SwiftUI/runtime issues discovered during the first full Xcode pass
-- only expand product scope again after the real runtime validation loop is stable
+- validate the new backend contracts against real responses and tighten any decode mismatches
+- fix any first-build or first-runtime issues discovered in Xcode tonight
+- add targeted tests around stats decoding, collection membership caching, and share-card caching
+- refine discovery/search behavior once the real semantic backend behavior is known
+- only expand scope again after the runtime validation loop is stable

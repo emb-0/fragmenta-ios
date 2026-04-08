@@ -44,4 +44,16 @@ extension Color {
             opacity: opacity
         )
     }
+
+    init?(fragmentaHexString rawValue: String, opacity: Double = 1) {
+        let sanitized = rawValue
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "#", with: "")
+
+        guard sanitized.count == 6, let hex = UInt(sanitized, radix: 16) else {
+            return nil
+        }
+
+        self.init(hex: hex, opacity: opacity)
+    }
 }

@@ -4,9 +4,17 @@ struct LibraryView: View {
     @StateObject private var viewModel: LibraryViewModel
     private let booksService: BooksServiceProtocol
 
-    init(booksService: BooksServiceProtocol) {
+    init(
+        booksService: BooksServiceProtocol,
+        preferencesStore: AppPreferencesStore
+    ) {
         self.booksService = booksService
-        _viewModel = StateObject(wrappedValue: LibraryViewModel(booksService: booksService))
+        _viewModel = StateObject(
+            wrappedValue: LibraryViewModel(
+                booksService: booksService,
+                preferencesStore: preferencesStore
+            )
+        )
     }
 
     var body: some View {
@@ -34,6 +42,7 @@ struct LibraryView: View {
         .navigationTitle("Library")
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(.hidden, for: .navigationBar)
+        .animation(.easeInOut(duration: 0.22), value: viewModel.viewMode)
         .task {
             viewModel.loadIfNeeded()
         }
@@ -67,54 +76,104 @@ struct LibraryView: View {
         } else {
             VStack(alignment: .leading, spacing: FragmentaSpacing.xxLarge) {
                 statusBanner
-                LibrarySummaryView(books: displayedBooks)
+                LibrarySummaryView(books: displayedBooks, viewMode: viewModel.viewMode)
 
-                ForEach(featuredShelves) { shelf in
-                    VStack(alignment: .leading, spacing: FragmentaSpacing.medium) {
-                        LibrarySectionHeading(title: shelf.title, subtitle: shelf.subtitle)
+                switch viewModel.viewMode {
+                case .journal:
+                    journalContent(displayedBooks: displayedBooks)
+                case .bookshelf:
+                    bookshelfContent(displayedBooks: displayedBooks)
+                }
+            }
+        }
+    }
 
-                        ForEach(shelf.books) { book in
-                            navigationCard(for: book, emphasized: shelf.emphasized)
-                        }
+    private func journalContent(displayedBooks: [Book]) -> some View {
+        let shelves = featuredShelves(for: displayedBooks)
+
+        VStack(alignment: .leading, spacing: FragmentaSpacing.xxLarge) {
+            ForEach(shelves) { shelf in
+                VStack(alignment: .leading, spacing: FragmentaSpacing.medium) {
+                    LibrarySectionHeading(title: shelf.title, subtitle: shelf.subtitle)
+
+                    ForEach(shelf.books) { book in
+                        navigationCard(for: book, emphasized: shelf.emphasized)
                     }
                 }
+            }
 
-                VStack(alignment: .leading, spacing: FragmentaSpacing.medium) {
-                    LibrarySectionHeading(
-                        title: featuredShelves.isEmpty ? "Shelf" : "Full shelf",
-                        subtitle: "The complete reading index, sorted by the current lens."
-                    )
+            VStack(alignment: .leading, spacing: FragmentaSpacing.medium) {
+                LibrarySectionHeading(
+                    title: shelves.isEmpty ? "Shelf" : "Full shelf",
+                    subtitle: "The complete reading index, sorted by the current lens."
+                )
 
-                    LazyVStack(spacing: FragmentaSpacing.large) {
-                        ForEach(displayedBooks) { book in
-                            navigationCard(for: book)
-                        }
+                LazyVStack(spacing: FragmentaSpacing.large) {
+                    ForEach(displayedBooks) { book in
+                        navigationCard(for: book)
                     }
                 }
             }
         }
     }
 
-    private var recentBooks: [Book] {
-        let candidates = (viewModel.state.value ?? []).filter(\.isRecentlyImported)
-        return Array(candidates.prefix(2))
+    private func bookshelfContent(displayedBooks: [Book]) -> some View {
+        let frontShelfBooks = featuredBooks(for: displayedBooks)
+
+        VStack(alignment: .leading, spacing: FragmentaSpacing.xxLarge) {
+            if frontShelfBooks.isEmpty == false {
+                VStack(alignment: .leading, spacing: FragmentaSpacing.medium) {
+                    LibrarySectionHeading(
+                        title: "Front shelf",
+                        subtitle: "A smaller ledge for the books that feel most alive right now."
+                    )
+
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(alignment: .top, spacing: FragmentaSpacing.large) {
+                            ForEach(frontShelfBooks) { book in
+                                navigationTile(for: book, emphasis: .featured)
+                                    .frame(width: 164)
+                            }
+                        }
+                        .padding(.vertical, FragmentaSpacing.small)
+                    }
+                }
+            }
+
+            VStack(alignment: .leading, spacing: FragmentaSpacing.medium) {
+                LibrarySectionHeading(
+                    title: "Bookshelf",
+                    subtitle: "A fast, cover-led shelf built for browsing with many books on hand."
+                )
+
+                LazyVGrid(
+                    columns: [GridItem(.adaptive(minimum: 132, maximum: 170), spacing: FragmentaSpacing.large)],
+                    alignment: .leading,
+                    spacing: FragmentaSpacing.xLarge
+                ) {
+                    ForEach(displayedBooks) { book in
+                        navigationTile(for: book, emphasis: .standard)
+                    }
+                }
+            }
+        }
     }
 
-    private var annotatedBooks: [Book] {
-        let books = (viewModel.state.value ?? [])
-            .filter { ($0.noteCount ?? 0) > 0 }
-            .sorted { ($0.noteCount ?? 0) > ($1.noteCount ?? 0) }
-        return Array(books.prefix(2))
-    }
-
-    private var mostHighlightedBooks: [Book] {
-        let books = (viewModel.state.value ?? [])
-            .sorted { $0.highlightCount > $1.highlightCount }
-        return Array(books.prefix(2))
-    }
-
-    private var featuredShelves: [LibraryShelfSection] {
+    private func featuredShelves(for books: [Book]) -> [LibraryShelfSection] {
         var sections: [LibraryShelfSection] = []
+
+        let recentBooks = Array(books.filter(\.isRecentlyImported).prefix(2))
+        let annotatedBooks = Array(
+            books
+                .filter { ($0.noteCount ?? 0) > 0 }
+                .sorted { ($0.noteCount ?? 0) > ($1.noteCount ?? 0) }
+                .prefix(2)
+        )
+        let mostHighlightedBooks = Array(
+            books
+                .sorted { $0.highlightCount > $1.highlightCount }
+                .prefix(2)
+        )
 
         if recentBooks.isEmpty == false {
             sections.append(
@@ -152,6 +211,15 @@ struct LibraryView: View {
         return sections
     }
 
+    private func featuredBooks(for books: [Book]) -> [Book] {
+        let recent = books.filter(\.isRecentlyImported)
+        if recent.isEmpty == false {
+            return Array(recent.prefix(6))
+        }
+
+        return Array(books.prefix(6))
+    }
+
     @ViewBuilder
     private var statusBanner: some View {
         switch viewModel.state {
@@ -180,22 +248,39 @@ struct LibraryView: View {
         }
     }
 
+    @ViewBuilder
     private var loadingContent: some View {
-        VStack(spacing: FragmentaSpacing.large) {
-            LibrarySummarySkeletonView()
+        switch viewModel.viewMode {
+        case .journal:
+            VStack(spacing: FragmentaSpacing.large) {
+                LibrarySummarySkeletonView()
 
-            ForEach(0 ..< 3, id: \.self) { _ in
-                BookShelfCardSkeletonView()
+                ForEach(0 ..< 3, id: \.self) { _ in
+                    BookShelfCardSkeletonView()
+                }
+            }
+        case .bookshelf:
+            VStack(spacing: FragmentaSpacing.large) {
+                LibrarySummarySkeletonView()
+                BookshelfGridSkeletonView()
             }
         }
     }
 
-    @ViewBuilder
     private func navigationCard(for book: Book, emphasized: Bool = false) -> some View {
         NavigationLink {
             BookDetailView(bookID: book.id, booksService: booksService)
         } label: {
             BookShelfCardView(book: book, emphasized: emphasized)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func navigationTile(for book: Book, emphasis: BookshelfCoverTileView.Emphasis) -> some View {
+        NavigationLink {
+            BookDetailView(bookID: book.id, booksService: booksService)
+        } label: {
+            BookshelfCoverTileView(book: book, emphasis: emphasis)
         }
         .buttonStyle(.plain)
     }
@@ -241,6 +326,23 @@ private struct LibraryControlsView: View {
                         .foregroundStyle(FragmentaColor.textPrimary)
                         .tracking(1.2)
                         .chipSurfaceStyle()
+                }
+            }
+
+            HStack(spacing: FragmentaSpacing.small) {
+                ForEach(LibraryViewMode.allCases) { mode in
+                    Button {
+                        viewModel.setViewMode(mode)
+                    } label: {
+                        HStack(spacing: FragmentaSpacing.xSmall) {
+                            Image(systemName: mode.systemImage)
+                            Text(mode.title)
+                        }
+                        .font(FragmentaTypography.metadata)
+                        .foregroundStyle(viewModel.viewMode == mode ? FragmentaColor.textPrimary : FragmentaColor.textSecondary)
+                        .chipSurfaceStyle()
+                    }
+                    .buttonStyle(.plain)
                 }
             }
 
@@ -313,6 +415,7 @@ private struct LibrarySectionHeading: View {
 
 private struct LibrarySummaryView: View {
     let books: [Book]
+    let viewMode: LibraryViewMode
 
     private var totalHighlights: Int {
         books.reduce(into: 0) { partialResult, book in
@@ -333,6 +436,10 @@ private struct LibrarySummaryView: View {
             }).first
         else {
             return "Your library is ready for the next import."
+        }
+
+        if viewMode == .bookshelf {
+            return "Shelf mode remembers where to look first: \(latest.title) was refreshed most recently."
         }
 
         return "Most recently refreshed: \(latest.title) by \(latest.displayAuthor)."
@@ -370,6 +477,69 @@ private struct LibrarySummaryView: View {
     }
 }
 
+private struct BookshelfCoverTileView: View {
+    enum Emphasis {
+        case featured
+        case standard
+    }
+
+    let book: Book
+    let emphasis: Emphasis
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: FragmentaSpacing.small) {
+            ZStack(alignment: .topLeading) {
+                BookCoverArtView(book: book, presentation: .bookshelf)
+                    .frame(maxWidth: .infinity)
+                    .aspectRatio(CGFloat(book.resolvedCoverAspectRatio), contentMode: .fit)
+
+                if book.isRecentlyImported {
+                    Text("RECENT")
+                        .font(FragmentaTypography.eyebrow)
+                        .foregroundStyle(FragmentaColor.textPrimary)
+                        .padding(.horizontal, FragmentaSpacing.xSmall)
+                        .padding(.vertical, FragmentaSpacing.tiny)
+                        .background(
+                            Capsule()
+                                .fill(FragmentaColor.background.opacity(0.82))
+                        )
+                        .padding(FragmentaSpacing.small)
+                }
+            }
+
+            VStack(alignment: .leading, spacing: FragmentaSpacing.xSmall) {
+                Text(book.title)
+                    .font(emphasis == .featured ? FragmentaTypography.cardTitle : FragmentaTypography.bodyEmphasized)
+                    .foregroundStyle(FragmentaColor.textPrimary)
+                    .lineLimit(emphasis == .featured ? 3 : 2)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                Text(book.displayAuthor)
+                    .font(FragmentaTypography.metadata)
+                    .foregroundStyle(FragmentaColor.textSecondary)
+                    .lineLimit(1)
+
+                HStack(spacing: FragmentaSpacing.small) {
+                    tileChip(book.highlightCountLabel)
+
+                    if let noteCountLabel = book.noteCountLabel, emphasis == .featured {
+                        tileChip(noteCountLabel)
+                    }
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
+    }
+
+    private func tileChip(_ text: String) -> some View {
+        Text(text)
+            .font(FragmentaTypography.caption)
+            .foregroundStyle(FragmentaColor.textTertiary)
+            .chipSurfaceStyle()
+    }
+}
+
 private struct LibrarySummarySkeletonView: View {
     var body: some View {
         VStack(spacing: FragmentaSpacing.medium) {
@@ -384,6 +554,31 @@ private struct LibrarySummarySkeletonView: View {
             RoundedRectangle(cornerRadius: FragmentaRadius.medium, style: .continuous)
                 .fill(FragmentaColor.surfaceOverlay)
                 .frame(height: 64)
+        }
+        .redacted(reason: .placeholder)
+    }
+}
+
+private struct BookshelfGridSkeletonView: View {
+    private let columns = [GridItem(.adaptive(minimum: 132, maximum: 170), spacing: FragmentaSpacing.large)]
+
+    var body: some View {
+        LazyVGrid(columns: columns, alignment: .leading, spacing: FragmentaSpacing.xLarge) {
+            ForEach(0 ..< 6, id: \.self) { _ in
+                VStack(alignment: .leading, spacing: FragmentaSpacing.small) {
+                    RoundedRectangle(cornerRadius: FragmentaRadius.large, style: .continuous)
+                        .fill(FragmentaColor.surfaceOverlay)
+                        .aspectRatio(0.67, contentMode: .fit)
+
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(FragmentaColor.surfaceOverlay)
+                        .frame(height: 18)
+
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(FragmentaColor.surfaceOverlay)
+                        .frame(width: 92, height: 14)
+                }
+            }
         }
         .redacted(reason: .placeholder)
     }
@@ -443,7 +638,10 @@ private struct EmptyLibraryState: View {
 struct LibraryView_Previews: PreviewProvider {
     static var previews: some View {
         NavigationStack {
-            LibraryView(booksService: PreviewBooksService())
+            LibraryView(
+                booksService: PreviewBooksService(),
+                preferencesStore: AppPreferencesStore()
+            )
         }
     }
 }

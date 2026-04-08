@@ -90,6 +90,12 @@ final class BookDetailViewModel: ObservableObject {
             let loadedDetail = try await detail
             var firstPage = try await highlightsPage
 
+            if let coverURL = loadedDetail.book.coverURL ?? loadedDetail.book.coverThumbnailURL {
+                Task.detached(priority: .utility) {
+                    await CoverImagePipeline.shared.prefetch(urls: [coverURL], maxPixelSize: 720)
+                }
+            }
+
             if let focusHighlightID {
                 let focusedHighlight = try? await booksService.fetchHighlight(id: focusHighlightID)
                 let mergedHighlights = mergeHighlights(existing: firstPage.items, inserting: focusedHighlight)

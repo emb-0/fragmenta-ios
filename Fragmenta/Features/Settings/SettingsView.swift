@@ -161,7 +161,7 @@ struct SettingsView: View {
                 .font(FragmentaTypography.sectionTitle)
                 .foregroundStyle(FragmentaColor.textPrimary)
 
-            Text(viewModel.cacheMessage ?? "Library snapshots, book detail payloads, import history, diagnostics, and recent searches are stored locally to keep the shell resilient.")
+            Text(viewModel.cacheMessage ?? "Library snapshots, book detail payloads, cover thumbnails, import history, diagnostics, and recent searches are stored locally to keep the shell resilient.")
                 .font(FragmentaTypography.body)
                 .foregroundStyle(FragmentaColor.textSecondary)
 

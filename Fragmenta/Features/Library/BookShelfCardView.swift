@@ -6,7 +6,8 @@ struct BookShelfCardView: View {
 
     var body: some View {
         let cardContent = HStack(alignment: .top, spacing: FragmentaSpacing.large) {
-            spine
+            BookCoverArtView(book: book, presentation: .list)
+                .frame(width: 82, height: emphasized ? 132 : 118)
 
             VStack(alignment: .leading, spacing: FragmentaSpacing.medium) {
                 HStack(alignment: .top, spacing: FragmentaSpacing.small) {
@@ -81,48 +82,6 @@ struct BookShelfCardView: View {
         }
     }
 
-    private var spine: some View {
-        RoundedRectangle(cornerRadius: FragmentaRadius.medium, style: .continuous)
-            .fill(
-                LinearGradient(
-                    colors: [
-                        FragmentaColor.surfaceQuaternary,
-                        emphasized ? FragmentaColor.accentSoft.opacity(0.62) : FragmentaColor.surfaceSecondary,
-                        FragmentaColor.surfaceMuted
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            )
-            .frame(width: 72, height: emphasized ? 132 : 118)
-            .overlay(
-                VStack(alignment: .leading, spacing: FragmentaSpacing.small) {
-                    Text(bookMonogram)
-                        .font(FragmentaTypography.sectionTitle)
-                        .foregroundStyle(FragmentaColor.textPrimary)
-
-                    Spacer()
-
-                    Text(sourceLabel.uppercased())
-                        .font(FragmentaTypography.eyebrow)
-                        .foregroundStyle(FragmentaColor.textSecondary)
-                        .tracking(1.1)
-                        .lineLimit(2)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                .padding(FragmentaSpacing.medium)
-            )
-    }
-
-    private var bookMonogram: String {
-        let words = book.title
-            .split(separator: " ")
-            .prefix(2)
-
-        let letters = words.compactMap { $0.first }.map { String($0) }.joined()
-        return letters.isEmpty ? "BK" : letters.uppercased()
-    }
-
     private var sourceLabel: String {
         book.source.rawValue
             .replacingOccurrences(of: "_", with: " ")
@@ -142,7 +101,7 @@ struct BookShelfCardSkeletonView: View {
         HStack(alignment: .top, spacing: FragmentaSpacing.large) {
             RoundedRectangle(cornerRadius: FragmentaRadius.medium, style: .continuous)
                 .fill(FragmentaColor.surfaceOverlay)
-                .frame(width: 72, height: 118)
+                .frame(width: 82, height: 118)
 
             VStack(alignment: .leading, spacing: FragmentaSpacing.medium) {
                 RoundedRectangle(cornerRadius: 6, style: .continuous)

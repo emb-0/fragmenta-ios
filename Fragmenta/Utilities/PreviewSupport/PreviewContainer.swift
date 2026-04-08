@@ -88,8 +88,8 @@ extension AppConfig {
         defaultAPIBaseURL: URL(string: "https://preview.fragmenta.local")!,
         requestTimeout: 20,
         appDisplayName: "Fragmenta",
-        appVersion: "0.4.0",
-        buildNumber: "4",
+        appVersion: "0.5.0",
+        buildNumber: "5",
         appGroupIdentifier: "group.preview.fragmenta"
     )
 }

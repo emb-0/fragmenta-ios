@@ -115,7 +115,7 @@ final class SearchViewModel: ObservableObject {
         searchTask = Task { [weak self] in
             guard let self else { return }
             if immediate == false {
-                try? await Task.sleep(nanoseconds: 300_000_000)
+                try? await Task.sleep(nanoseconds: 220_000_000)
             }
             guard Task.isCancelled == false else { return }
             await self.performSearch()

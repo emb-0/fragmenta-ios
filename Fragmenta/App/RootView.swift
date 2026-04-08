@@ -8,7 +8,10 @@ struct RootView: View {
 
         TabView(selection: $appState.selectedTab) {
             NavigationStack {
-                LibraryView(booksService: container.booksService)
+                LibraryView(
+                    booksService: container.booksService,
+                    preferencesStore: container.preferencesStore
+                )
             }
             .tabItem {
                 Label(RootTab.library.title, systemImage: RootTab.library.systemImage)

@@ -4,6 +4,7 @@ final class AppPreferencesStore {
     private enum Key {
         static let developmentBaseURLOverride = "fragmenta.preferences.developmentBaseURLOverride"
         static let recentSearches = "fragmenta.preferences.recentSearches"
+        static let libraryViewMode = "fragmenta.preferences.libraryViewMode"
     }
 
     private let defaults: UserDefaults
@@ -18,6 +19,16 @@ final class AppPreferencesStore {
         }
         set {
             defaults.setValue(newValue, forKey: Key.developmentBaseURLOverride)
+        }
+    }
+
+    var libraryViewMode: LibraryViewMode {
+        get {
+            let rawValue = defaults.string(forKey: Key.libraryViewMode)
+            return rawValue.flatMap(LibraryViewMode.init(rawValue:)) ?? .journal
+        }
+        set {
+            defaults.setValue(newValue.rawValue, forKey: Key.libraryViewMode)
         }
     }
 

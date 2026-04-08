@@ -83,7 +83,7 @@ final class SettingsViewModel: ObservableObject {
     private func performClearCache(using appState: AppState) async {
         do {
             try await appState.clearCachedData()
-            cacheMessage = "Local caches cleared."
+            cacheMessage = "Local caches, including cover art, cleared."
             load()
         } catch {
             cacheMessage = Self.errorMessage(for: error)

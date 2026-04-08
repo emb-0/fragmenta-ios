@@ -5,12 +5,19 @@ import Foundation
 final class LibraryViewModel: ObservableObject {
     @Published private(set) var state: LoadableState<[Book]> = .idle
     @Published private(set) var query = LibraryQuery()
+    @Published private(set) var viewMode: LibraryViewMode
 
     private let booksService: BooksServiceProtocol
+    private let preferencesStore: AppPreferencesStore
     private var loadTask: Task<Void, Never>?
 
-    init(booksService: BooksServiceProtocol) {
+    init(
+        booksService: BooksServiceProtocol,
+        preferencesStore: AppPreferencesStore
+    ) {
         self.booksService = booksService
+        self.preferencesStore = preferencesStore
+        self.viewMode = preferencesStore.libraryViewMode
     }
 
     deinit {
@@ -25,6 +32,19 @@ final class LibraryViewModel: ObservableObject {
 
     func refresh() {
         load()
+    }
+
+    func setViewMode(_ viewMode: LibraryViewMode) {
+        guard self.viewMode != viewMode else {
+            return
+        }
+
+        self.viewMode = viewMode
+        preferencesStore.libraryViewMode = viewMode
+
+        if let books = state.value {
+            prefetchCoverImages(for: books)
+        }
     }
 
     func updateSort(_ sort: LibraryQuery.Sort) {
@@ -58,6 +78,10 @@ final class LibraryViewModel: ObservableObject {
         let cachedBooks = await booksService.loadCachedBooks(query: query)
         let previousBooks = state.value ?? cachedBooks
 
+        if let cachedBooks {
+            prefetchCoverImages(for: cachedBooks)
+        }
+
         if let previousBooks {
             state = .loading(previous: previousBooks)
         } else {
@@ -66,6 +90,7 @@ final class LibraryViewModel: ObservableObject {
 
         do {
             let books = try await booksService.fetchBooks(query: query)
+            prefetchCoverImages(for: books)
             state = .loaded(books, source: .remote)
         } catch is CancellationError {
             return
@@ -86,5 +111,21 @@ final class LibraryViewModel: ObservableObject {
         }
 
         return "Unable to load the library right now."
+    }
+
+    private func prefetchCoverImages(for books: [Book]) {
+        let candidates = books.compactMap { $0.coverThumbnailURL ?? $0.coverURL }
+        var seen = Set<URL>()
+        let urls = candidates
+            .filter { seen.insert($0).inserted }
+            .prefix(viewMode == .bookshelf ? 30 : 18)
+
+        guard urls.isEmpty == false else {
+            return
+        }
+
+        Task.detached(priority: .utility) {
+            await CoverImagePipeline.shared.prefetch(urls: Array(urls), maxPixelSize: 420)
+        }
     }
 }

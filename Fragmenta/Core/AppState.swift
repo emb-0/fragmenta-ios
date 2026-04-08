@@ -63,13 +63,14 @@ final class AppState: ObservableObject {
     func clearCachedData() async throws {
         try await container.cacheStore.removeAll()
         try? await container.sharedImportStore.clearPendingDraft()
+        CoverImagePipeline.shared.clear()
         preferencesStore.clearRecentSearches()
         pendingIncomingImportDraft = nil
         pendingIncomingImportErrorMessage = nil
         container.diagnosticsStore.record(
             event: .cache,
             status: .success,
-            detail: "Cleared local cache store and pending shared import drafts."
+            detail: "Cleared local cache store, cover cache, and pending shared import drafts."
         )
     }
 

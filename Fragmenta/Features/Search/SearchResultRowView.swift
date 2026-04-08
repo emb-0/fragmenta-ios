@@ -1,4 +1,7 @@
 import SwiftUI
+#if canImport(UIKit)
+import UIKit
+#endif
 
 struct SearchResultRowView: View {
     let result: HighlightSearchResult
@@ -34,7 +37,7 @@ struct SearchResultRowView: View {
                     .foregroundStyle(result.matchedInNote == true ? FragmentaColor.accentSoft : FragmentaColor.accent)
                     .padding(.top, -4)
 
-                Text(result.displaySnippet)
+                Text(highlightedSnippet)
                     .font(FragmentaTypography.narrative)
                     .foregroundStyle(FragmentaColor.textPrimary.opacity(0.92))
                     .lineLimit(5)
@@ -80,6 +83,15 @@ struct SearchResultRowView: View {
             }
         }
         .sectionSurfaceStyle()
+        .contextMenu {
+            Button("Copy Snippet") {
+                copyToPasteboard(result.highlight.shareBody)
+            }
+
+            Button("Copy With Citation") {
+                copyToPasteboard(result.highlight.copyBodyWithCitation(citation: citation))
+            }
+        }
     }
 
     private func metadataChip(_ title: String) -> some View {
@@ -87,6 +99,41 @@ struct SearchResultRowView: View {
             .font(FragmentaTypography.chip)
             .foregroundStyle(FragmentaColor.textSecondary)
             .chipSurfaceStyle()
+    }
+
+    private var citation: HighlightCitation {
+        HighlightCitation(
+            bookTitle: result.book.title,
+            author: result.book.author,
+            chapter: result.highlight.chapter,
+            locationLabel: result.highlight.locationLabel
+        )
+    }
+
+    private var highlightedSnippet: AttributedString {
+        var attributed = AttributedString(result.displaySnippet)
+        let terms = result.matchedTerms
+            .map(\.trimmed)
+            .filter { $0.isBlank == false }
+            .sorted { $0.count > $1.count }
+
+        for term in terms {
+            var searchRange = attributed.startIndex ..< attributed.endIndex
+
+            while let range = attributed.range(of: term, options: [.caseInsensitive], range: searchRange, locale: .current) {
+                attributed[range].foregroundColor = result.matchedInNote == true ? FragmentaColor.accentSoft : FragmentaColor.accent
+                searchRange = range.upperBound ..< attributed.endIndex
+            }
+        }
+
+        return attributed
+    }
+
+    private func copyToPasteboard(_ value: String) {
+#if canImport(UIKit)
+        UIPasteboard.general.string = value
+#endif
+        HapticFeedback.selectionChanged()
     }
 }
 

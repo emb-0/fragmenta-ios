@@ -74,6 +74,10 @@ final class SearchViewModel: ObservableObject {
         recentSearches = []
     }
 
+    func retryCurrentSearch() {
+        scheduleSearch(immediate: true)
+    }
+
     func loadMoreIfNeeded(currentResult: HighlightSearchResult) {
         guard
             let results = state.value,

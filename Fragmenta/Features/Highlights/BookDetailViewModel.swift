@@ -8,6 +8,7 @@ final class BookDetailViewModel: ObservableObject {
     @Published private(set) var pageInfo = PageInfo.singlePage(itemCount: 0, limit: 24)
     @Published private(set) var isLoadingMore = false
     @Published private(set) var focusedHighlightID: String?
+    @Published private(set) var loadMoreFailureMessage: String?
 
     private let bookID: String
     private let focusHighlightID: String?
@@ -40,6 +41,17 @@ final class BookDetailViewModel: ObservableObject {
         load()
     }
 
+    func retryLoadMore() {
+        guard pageInfo.hasMore else {
+            return
+        }
+
+        loadMoreTask?.cancel()
+        loadMoreTask = Task { [weak self] in
+            await self?.performLoadMore()
+        }
+    }
+
     func loadMoreIfNeeded(currentHighlight: Highlight) {
         guard
             let highlights = highlightsState.value,
@@ -66,6 +78,7 @@ final class BookDetailViewModel: ObservableObject {
     private func performInitialLoad() async {
         let cachedDetail = await booksService.loadCachedBookDetail(bookID: bookID)
         let cachedHighlightsPage = await booksService.loadCachedHighlights(bookID: bookID, page: PageRequest(page: 1, limit: 24))
+        loadMoreFailureMessage = nil
 
         detailState = .loading(previous: detailState.value ?? cachedDetail)
         highlightsState = .loading(previous: highlightsState.value ?? cachedHighlightsPage?.items)
@@ -115,6 +128,7 @@ final class BookDetailViewModel: ObservableObject {
         }
 
         isLoadingMore = true
+        loadMoreFailureMessage = nil
         defer { isLoadingMore = false }
 
         do {
@@ -130,6 +144,7 @@ final class BookDetailViewModel: ObservableObject {
         } catch is CancellationError {
             return
         } catch {
+            loadMoreFailureMessage = Self.errorMessage(for: error)
             if let existingHighlights = highlightsState.value {
                 highlightsState = .failed(Self.errorMessage(for: error), previous: existingHighlights)
             } else {

@@ -76,6 +76,10 @@ struct PreviewExportService: ExportServiceProtocol {
     func exportLibrary(format: ExportFormat) async throws -> ExportArtifact {
         PreviewFixtures.exportArtifact
     }
+
+    func exportBook(bookID: String, format: ExportFormat) async throws -> ExportArtifact {
+        PreviewFixtures.exportArtifact
+    }
 }
 
 extension AppConfig {
@@ -84,8 +88,9 @@ extension AppConfig {
         defaultAPIBaseURL: URL(string: "https://preview.fragmenta.local")!,
         requestTimeout: 20,
         appDisplayName: "Fragmenta",
-        appVersion: "0.3.0",
-        buildNumber: "3"
+        appVersion: "0.4.0",
+        buildNumber: "4",
+        appGroupIdentifier: "group.preview.fragmenta"
     )
 }
 
@@ -95,6 +100,7 @@ extension AppContainer {
         cacheStore: FragmentaCacheStore(),
         preferencesStore: AppPreferencesStore(),
         diagnosticsStore: DiagnosticsStore(),
+        sharedImportStore: SharedImportStore(appGroupIdentifier: AppConfig.preview.appGroupIdentifier),
         booksService: PreviewBooksService(),
         searchService: PreviewSearchService(),
         importService: PreviewImportService(),

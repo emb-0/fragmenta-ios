@@ -5,24 +5,36 @@ import Foundation
 final class SettingsViewModel: ObservableObject {
     @Published private(set) var diagnostics = DiagnosticsSnapshot.empty
     @Published private(set) var exportStates: [ExportFormat: LoadableState<ExportArtifact>] = [:]
+    @Published private(set) var lastImportResponse: ImportResponse?
     @Published var baseURLOverrideDraft: String
     @Published private(set) var cacheMessage: String?
 
     private let exportService: ExportServiceProtocol
+    private let importService: ImportServiceProtocol
     private let diagnosticsStore: DiagnosticsStore
 
     init(
         exportService: ExportServiceProtocol,
+        importService: ImportServiceProtocol,
         diagnosticsStore: DiagnosticsStore,
         baseURLOverride: String
     ) {
         self.exportService = exportService
+        self.importService = importService
         self.diagnosticsStore = diagnosticsStore
         self.baseURLOverrideDraft = baseURLOverride
     }
 
     func load() {
         diagnostics = diagnosticsStore.snapshot()
+
+        Task { @MainActor [weak self] in
+            guard let self else {
+                return
+            }
+
+            lastImportResponse = await importService.loadCachedLastImportResponse()
+        }
     }
 
     func export(_ format: ExportFormat) {

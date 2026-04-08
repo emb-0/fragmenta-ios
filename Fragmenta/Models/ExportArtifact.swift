@@ -34,8 +34,23 @@ enum ExportFormat: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
+enum ExportScope: Hashable, Sendable {
+    case library
+    case book(bookID: String)
+
+    var queryItems: [URLQueryItem] {
+        switch self {
+        case .library:
+            return []
+        case .book(let bookID):
+            return [URLQueryItem(name: "book_id", value: bookID)]
+        }
+    }
+}
+
 struct ExportArtifact: Hashable, Sendable {
     let format: ExportFormat
+    let scope: ExportScope
     let fileURL: URL
     let generatedAt: Date
     let byteCount: Int

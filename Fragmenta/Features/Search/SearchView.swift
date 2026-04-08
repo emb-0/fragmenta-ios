@@ -72,8 +72,10 @@ struct SearchView: View {
                 SearchEmptyState(
                     title: "Search unavailable",
                     message: message,
-                    actionTitle: nil,
-                    action: nil
+                    actionTitle: "Try again",
+                    action: {
+                        viewModel.retryCurrentSearch()
+                    }
                 )
             case .loaded:
                 SearchEmptyState(

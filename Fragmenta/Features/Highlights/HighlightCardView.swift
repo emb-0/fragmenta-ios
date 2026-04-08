@@ -5,9 +5,10 @@ import UIKit
 
 struct HighlightCardView: View {
     let highlight: Highlight
+    let citation: HighlightCitation?
     var isFocused = false
 
-    @State private var didCopy = false
+    @State private var copyFeedback: CopyFeedback?
 
     var body: some View {
         VStack(alignment: .leading, spacing: FragmentaSpacing.large) {
@@ -64,6 +65,7 @@ struct HighlightCardView: View {
             Text(highlight.text.trimmed)
                 .font(isFocused ? FragmentaTypography.quoteEmphasized : FragmentaTypography.quote)
                 .foregroundStyle(FragmentaColor.textPrimary)
+                .textSelection(.enabled)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
@@ -83,6 +85,7 @@ struct HighlightCardView: View {
                 Text(note)
                     .font(FragmentaTypography.body)
                     .foregroundStyle(FragmentaColor.textSecondary)
+                    .textSelection(.enabled)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -115,14 +118,23 @@ struct HighlightCardView: View {
 
     private var actionRow: some View {
         HStack(spacing: FragmentaSpacing.small) {
-            Button(didCopy ? "Copied" : "Copy") {
-                copyToPasteboard()
+            Button(copyFeedback == .plain ? "Copied" : "Copy") {
+                copyToPasteboard(highlight.shareBody, feedback: .plain)
             }
             .font(FragmentaTypography.metadata)
-            .foregroundStyle(didCopy ? FragmentaColor.textPrimary : FragmentaColor.textSecondary)
+            .foregroundStyle(copyFeedback == .plain ? FragmentaColor.textPrimary : FragmentaColor.textSecondary)
             .chipSurfaceStyle()
 
-            ShareLink(item: highlight.shareBody) {
+            if citation != nil {
+                Button(copyFeedback == .citation ? "Copied Citation" : "Copy Citation") {
+                    copyToPasteboard(highlight.copyBodyWithCitation(citation: citation), feedback: .citation)
+                }
+                .font(FragmentaTypography.metadata)
+                .foregroundStyle(copyFeedback == .citation ? FragmentaColor.textPrimary : FragmentaColor.textSecondary)
+                .chipSurfaceStyle()
+            }
+
+            ShareLink(item: highlight.shareBody(citation: citation)) {
                 Text("Share")
                     .font(FragmentaTypography.metadata)
                     .foregroundStyle(FragmentaColor.textSecondary)
@@ -138,18 +150,25 @@ struct HighlightCardView: View {
             .chipSurfaceStyle()
     }
 
-    private func copyToPasteboard() {
+    private func copyToPasteboard(_ value: String, feedback: CopyFeedback) {
 #if canImport(UIKit)
-        UIPasteboard.general.string = highlight.shareBody
+        UIPasteboard.general.string = value
 #endif
         HapticFeedback.selectionChanged()
-        didCopy = true
+        copyFeedback = feedback
 
         Task { @MainActor in
             try? await Task.sleep(nanoseconds: 1_200_000_000)
-            didCopy = false
+            if copyFeedback == feedback {
+                copyFeedback = nil
+            }
         }
     }
+}
+
+private enum CopyFeedback {
+    case plain
+    case citation
 }
 
 struct HighlightCardSkeletonView: View {
@@ -176,7 +195,16 @@ struct HighlightCardSkeletonView: View {
 struct HighlightCardView_Previews: PreviewProvider {
     static var previews: some View {
         FragmentaScreenBackground {
-            HighlightCardView(highlight: PreviewFixtures.highlights[0], isFocused: true)
+            HighlightCardView(
+                highlight: PreviewFixtures.highlights[0],
+                citation: HighlightCitation(
+                    bookTitle: PreviewFixtures.bookDetail.book.title,
+                    author: PreviewFixtures.bookDetail.book.author,
+                    chapter: PreviewFixtures.highlights[0].chapter,
+                    locationLabel: PreviewFixtures.highlights[0].locationLabel
+                ),
+                isFocused: true
+            )
                 .padding(FragmentaSpacing.large)
         }
     }

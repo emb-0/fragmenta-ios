@@ -9,12 +9,14 @@ struct SettingsView: View {
     init(
         config: AppConfig,
         exportService: ExportServiceProtocol,
+        importService: ImportServiceProtocol,
         diagnosticsStore: DiagnosticsStore
     ) {
         self.config = config
         _viewModel = StateObject(
             wrappedValue: SettingsViewModel(
                 exportService: exportService,
+                importService: importService,
                 diagnosticsStore: diagnosticsStore,
                 baseURLOverride: ""
             )
@@ -60,7 +62,7 @@ struct SettingsView: View {
                 .font(FragmentaTypography.sectionTitle)
                 .foregroundStyle(FragmentaColor.textPrimary)
 
-            Text("Fragmenta is the native reading artifact for Kindle exports parsed by fragmenta-core. Sprint 3 makes the iOS client the most polished expression of the product family so far.")
+            Text("Fragmenta is the native reading artifact for Kindle exports parsed by fragmenta-core. Sprint 4 tightens the native ingest, export, and runtime-validation seams without changing the app’s core shape.")
                 .font(FragmentaTypography.body)
                 .foregroundStyle(FragmentaColor.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -69,6 +71,7 @@ struct SettingsView: View {
             LabeledSettingRow(label: "Version", value: config.appVersion)
             LabeledSettingRow(label: "Build", value: config.buildNumber)
             LabeledSettingRow(label: "Authentication", value: "Intentionally disabled for now.")
+            LabeledSettingRow(label: "Share Intake", value: config.appGroupIdentifier ?? "Set FRAGMENTA_APP_GROUP_IDENTIFIER in Xcode before validating shared ingest.")
         }
         .sectionSurfaceStyle()
     }
@@ -85,6 +88,7 @@ struct SettingsView: View {
 
             LabeledSettingRow(label: "Active", value: config.apiBaseURL.absoluteString, monospaced: true)
             LabeledSettingRow(label: "Default", value: config.defaultAPIBaseURL.absoluteString, monospaced: true)
+            LabeledSettingRow(label: "App Group", value: config.appGroupIdentifier ?? "Not configured", monospaced: true)
 
 #if DEBUG
             VStack(alignment: .leading, spacing: FragmentaSpacing.small) {
@@ -143,6 +147,10 @@ struct SettingsView: View {
             DiagnosticRow(title: "Import Commit", event: viewModel.diagnostics.lastImportCommitEvent)
             DiagnosticRow(title: "Exports", event: viewModel.diagnostics.lastExportEvent)
             DiagnosticRow(title: "Cache", event: viewModel.diagnostics.lastCacheEvent)
+
+            if let lastImportResponse = viewModel.lastImportResponse {
+                CachedImportRow(response: lastImportResponse)
+            }
         }
         .sectionSurfaceStyle()
     }
@@ -163,6 +171,29 @@ struct SettingsView: View {
             .fragmentaAdaptiveGlassButton()
         }
         .sectionSurfaceStyle()
+    }
+}
+
+private struct CachedImportRow: View {
+    let response: ImportResponse
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: FragmentaSpacing.xSmall) {
+            Text("LAST IMPORT".uppercased())
+                .font(FragmentaTypography.eyebrow)
+                .foregroundStyle(FragmentaColor.textTertiary)
+                .tracking(1.2)
+
+            Text(response.message ?? response.summaryLine)
+                .font(FragmentaTypography.body)
+                .foregroundStyle(FragmentaColor.textSecondary)
+
+            Text("\(response.status.rawValue.capitalized) · \(response.filename ?? "Kindle import")")
+                .font(FragmentaTypography.caption)
+                .foregroundStyle(FragmentaColor.textTertiary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .insetSurfaceStyle()
     }
 }
 
@@ -294,6 +325,7 @@ struct SettingsView_Previews: PreviewProvider {
             SettingsView(
                 config: .preview,
                 exportService: PreviewExportService(),
+                importService: PreviewImportService(),
                 diagnosticsStore: DiagnosticsStore()
             )
             .environmentObject(AppState(container: .preview))

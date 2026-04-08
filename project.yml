@@ -35,7 +35,33 @@ targets:
       base:
         PRODUCT_NAME: Fragmenta
         PRODUCT_BUNDLE_IDENTIFIER: com.fragmenta.ios
-        MARKETING_VERSION: 0.3.0
-        CURRENT_PROJECT_VERSION: 3
+        MARKETING_VERSION: 0.4.0
+        CURRENT_PROJECT_VERSION: 4
+        CODE_SIGN_ENTITLEMENTS: Config/Fragmenta.entitlements
+    dependencies:
+      - target: FragmentaShareExtension
+        embed: true
     scheme:
       gatherCoverageData: false
+  FragmentaShareExtension:
+    type: app-extension
+    platform: iOS
+    deploymentTarget: "17.0"
+    configFiles:
+      Debug: Config/Debug.xcconfig
+      Release: Config/Release.xcconfig
+    sources:
+      - path: Fragmenta/Core/ImportIntake
+      - path: Fragmenta/Utilities/Codable+Fragmenta.swift
+      - path: Fragmenta/Utilities/String+Fragmenta.swift
+      - path: FragmentaShareExtension
+    settings:
+      base:
+        PRODUCT_NAME: FragmentaShareExtension
+        PRODUCT_BUNDLE_IDENTIFIER: $(FRAGMENTA_SHARE_EXTENSION_BUNDLE_IDENTIFIER)
+        MARKETING_VERSION: 0.4.0
+        CURRENT_PROJECT_VERSION: 4
+        INFOPLIST_FILE: Config/ShareExtension-Info.plist
+        CODE_SIGN_ENTITLEMENTS: Config/FragmentaShareExtension.entitlements
+        APPLICATION_EXTENSION_API_ONLY: YES
+        SKIP_INSTALL: YES

@@ -1,7 +1,9 @@
 import SwiftUI
 
 struct ImportView: View {
+    @EnvironmentObject private var appState: AppState
     @StateObject private var viewModel: ImportViewModel
+    @State private var lastAppliedIncomingDraftID: UUID?
 
     init(importService: ImportServiceProtocol) {
         _viewModel = StateObject(wrappedValue: ImportViewModel(importService: importService))
@@ -16,6 +18,15 @@ struct ImportView: View {
                         title: "Bring in a Kindle export",
                         subtitle: "Preview the backend parse before committing, whether the source arrives from pasted text or a `.txt` document."
                     )
+
+                    if let pendingIncomingImportErrorMessage = appState.pendingIncomingImportErrorMessage {
+                        IncomingImportIssueCard(
+                            message: pendingIncomingImportErrorMessage,
+                            dismissAction: {
+                                appState.dismissPendingIncomingImportError()
+                            }
+                        )
+                    }
 
                     sourceModePicker
                     importSourceCard
@@ -36,6 +47,10 @@ struct ImportView: View {
         }
         .task {
             viewModel.loadIfNeeded()
+            applyPendingIncomingDraftIfNeeded()
+        }
+        .onChange(of: appState.pendingIncomingImportDraft?.id, initial: false) { _, _ in
+            applyPendingIncomingDraftIfNeeded()
         }
         .sheet(isPresented: $viewModel.isShowingDocumentPicker) {
             KindleDocumentPicker { url in
@@ -100,11 +115,11 @@ struct ImportView: View {
         VStack(alignment: .leading, spacing: FragmentaSpacing.medium) {
             HStack {
                 VStack(alignment: .leading, spacing: FragmentaSpacing.xSmall) {
-                    Text(viewModel.sourceMode == .paste ? "Paste the manuscript" : "Selected document")
+                    Text(sourceCardTitle)
                         .font(FragmentaTypography.sectionTitle)
                         .foregroundStyle(FragmentaColor.textPrimary)
 
-                    Text(viewModel.sourceMode == .paste ? "Paste the full Kindle export, then preview before import." : "Choose a `.txt` file and review the imported text before it reaches the backend.")
+                    Text(sourceCardSubtitle)
                         .font(FragmentaTypography.metadata)
                         .foregroundStyle(FragmentaColor.textSecondary)
                 }
@@ -123,7 +138,11 @@ struct ImportView: View {
                 FileSelectionCard(importedFile: importedFile)
             }
 
-            ImportDraftStats(rawText: viewModel.rawText, sourceMode: viewModel.sourceMode)
+            ImportDraftStats(
+                rawText: viewModel.rawText,
+                sourceMode: viewModel.sourceMode,
+                sourceLabel: viewModel.intakeSourceSummary
+            )
 
             ZStack(alignment: .topLeading) {
                 if viewModel.rawText.isBlank {
@@ -305,11 +324,51 @@ struct ImportView: View {
             return "folder"
         }
     }
+
+    private var sourceCardTitle: String {
+        if let importedFile = viewModel.importedFile, importedFile.source == .shareExtension {
+            return "Incoming shared text"
+        }
+
+        return viewModel.sourceMode == .paste ? "Paste the manuscript" : "Selected document"
+    }
+
+    private var sourceCardSubtitle: String {
+        if let importedFile = viewModel.importedFile {
+            switch importedFile.source {
+            case .shareExtension:
+                return "Shared text is staged here first, so you can preview the parse before sending anything to fragmenta-core."
+            case .documentPicker, .filesApp:
+                return "Review the imported text before it reaches the backend, then preview the parse and confirm the commit."
+            case .pastedText:
+                return "Paste the full Kindle export, then preview before import."
+            }
+        }
+
+        return viewModel.sourceMode == .paste
+            ? "Paste the full Kindle export, then preview before import."
+            : "Choose a `.txt` file and review the imported text before it reaches the backend."
+    }
+
+    private func applyPendingIncomingDraftIfNeeded() {
+        guard let pendingDraft = appState.pendingIncomingImportDraft else {
+            return
+        }
+
+        guard pendingDraft.id != lastAppliedIncomingDraftID else {
+            return
+        }
+
+        viewModel.applyIncomingDraft(pendingDraft)
+        lastAppliedIncomingDraftID = pendingDraft.id
+        appState.consumePendingIncomingImportDraft()
+    }
 }
 
 private struct ImportDraftStats: View {
     let rawText: String
     let sourceMode: ImportViewModel.SourceMode
+    let sourceLabel: String?
 
     private var lineCount: Int {
         rawText.isBlank ? 0 : rawText.components(separatedBy: .newlines).count
@@ -321,7 +380,7 @@ private struct ImportDraftStats: View {
 
     var body: some View {
         HStack(spacing: FragmentaSpacing.medium) {
-            stat(value: sourceMode.title, label: "source")
+            stat(value: sourceLabel ?? sourceMode.title, label: "source")
             stat(value: "\(lineCount)", label: "lines")
             stat(value: "\(characterCount)", label: "characters")
         }
@@ -352,12 +411,40 @@ private struct FileSelectionCard: View {
                 .font(FragmentaTypography.bodyEmphasized)
                 .foregroundStyle(FragmentaColor.textPrimary)
 
-            Text(ByteCountFormatter.string(fromByteCount: Int64(importedFile.byteCount), countStyle: .file))
+            Text("\(importedFile.source.title) · \(ByteCountFormatter.string(fromByteCount: Int64(importedFile.byteCount), countStyle: .file))")
                 .font(FragmentaTypography.metadata)
                 .foregroundStyle(FragmentaColor.textSecondary)
+
+            Text(importedFile.receivedAt.fragmentaDayMonthYearString())
+                .font(FragmentaTypography.caption)
+                .foregroundStyle(FragmentaColor.textTertiary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .insetSurfaceStyle()
+    }
+}
+
+private struct IncomingImportIssueCard: View {
+    let message: String
+    let dismissAction: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: FragmentaSpacing.medium) {
+            Text("Incoming file issue")
+                .font(FragmentaTypography.sectionTitle)
+                .foregroundStyle(FragmentaColor.textPrimary)
+
+            Text(message)
+                .font(FragmentaTypography.body)
+                .foregroundStyle(FragmentaColor.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Button("Dismiss") {
+                dismissAction()
+            }
+            .fragmentaAdaptiveGlassButton()
+        }
+        .sectionSurfaceStyle()
     }
 }
 
@@ -403,11 +490,19 @@ private struct ImportPreviewCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: FragmentaSpacing.large) {
-            Text("Preview summary")
-                .font(FragmentaTypography.sectionTitle)
-                .foregroundStyle(FragmentaColor.textPrimary)
+            VStack(alignment: .leading, spacing: FragmentaSpacing.small) {
+                Text("Preview summary")
+                    .font(FragmentaTypography.sectionTitle)
+                    .foregroundStyle(FragmentaColor.textPrimary)
+
+                Text(preview.message ?? "Fragmenta will send a second commit request only after you confirm this preview.")
+                    .font(FragmentaTypography.body)
+                    .foregroundStyle(FragmentaColor.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
 
             ImportSummaryGrid(summary: preview.summary)
+            ImportPreviewSignals(summary: preview.summary)
 
             if preview.detectedBooks.isEmpty == false {
                 VStack(alignment: .leading, spacing: FragmentaSpacing.small) {
@@ -451,18 +546,50 @@ private struct ImportResultCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: FragmentaSpacing.large) {
-            Text("Import complete")
-                .font(FragmentaTypography.sectionTitle)
-                .foregroundStyle(FragmentaColor.textPrimary)
+            VStack(alignment: .leading, spacing: FragmentaSpacing.small) {
+                Text(response.status == .failed ? "Import issue" : "Import complete")
+                    .font(FragmentaTypography.sectionTitle)
+                    .foregroundStyle(FragmentaColor.textPrimary)
+
+                Text(response.message ?? response.summaryLine)
+                    .font(FragmentaTypography.body)
+                    .foregroundStyle(FragmentaColor.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
 
             ImportSummaryGrid(summary: response.summary)
+            ImportPreviewSignals(summary: response.summary)
 
-            Text(response.message ?? response.summaryLine)
-                .font(FragmentaTypography.body)
-                .foregroundStyle(FragmentaColor.textSecondary)
-                .fixedSize(horizontal: false, vertical: true)
+            VStack(alignment: .leading, spacing: FragmentaSpacing.small) {
+                if let filename = response.filename, filename.isBlank == false {
+                    resultMetadataRow(label: "Source", value: filename)
+                }
+
+                resultMetadataRow(label: "Status", value: response.status.rawValue.capitalized)
+
+                if let completedAt = response.completedAt ?? response.createdAt {
+                    resultMetadataRow(label: "Updated", value: completedAt.fragmentaDayMonthYearString())
+                }
+            }
         }
         .sectionSurfaceStyle()
+    }
+
+    private func resultMetadataRow(label: String, value: String) -> some View {
+        HStack(alignment: .top, spacing: FragmentaSpacing.small) {
+            Text(label.uppercased())
+                .font(FragmentaTypography.eyebrow)
+                .foregroundStyle(FragmentaColor.textTertiary)
+                .tracking(1.2)
+
+            Spacer()
+
+            Text(value)
+                .font(FragmentaTypography.metadata)
+                .foregroundStyle(FragmentaColor.textSecondary)
+                .multilineTextAlignment(.trailing)
+        }
+        .insetSurfaceStyle()
     }
 }
 
@@ -520,6 +647,35 @@ private struct WarningSection: View {
                 .insetSurfaceStyle()
             }
         }
+    }
+}
+
+private struct ImportPreviewSignals: View {
+    let summary: ImportSummary
+
+    var body: some View {
+        HStack(spacing: FragmentaSpacing.small) {
+            if summary.duplicatesDetected > 0 {
+                signal("Duplicates detected", color: FragmentaColor.warning)
+            }
+
+            if summary.resolvedWarningsCount > 0 {
+                signal("\(summary.resolvedWarningsCount) warnings", color: FragmentaColor.warning)
+            }
+
+            if summary.duplicatesDetected == 0, summary.resolvedWarningsCount == 0 {
+                signal("No obvious conflicts", color: FragmentaColor.accentSoft)
+            }
+
+            Spacer()
+        }
+    }
+
+    private func signal(_ title: String, color: Color) -> some View {
+        Text(title)
+            .font(FragmentaTypography.chip)
+            .foregroundStyle(color)
+            .chipSurfaceStyle()
     }
 }
 
@@ -596,6 +752,7 @@ struct ImportView_Previews: PreviewProvider {
         NavigationStack {
             ImportView(importService: PreviewImportService())
         }
+        .environmentObject(AppState(container: .preview))
     }
 }
 #endif

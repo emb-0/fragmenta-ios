@@ -7,6 +7,7 @@ struct AppConfig: Hashable, Sendable {
     let appDisplayName: String
     let appVersion: String
     let buildNumber: String
+    let appGroupIdentifier: String?
 
     static func live(
         bundle: Bundle = .main,
@@ -35,6 +36,8 @@ struct AppConfig: Hashable, Sendable {
             ?? "Fragmenta"
         let appVersion = bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.0.0"
         let buildNumber = bundle.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "0"
+        let appGroupIdentifier = (bundle.object(forInfoDictionaryKey: "FragmentaAppGroupIdentifier") as? String)?.trimmed
+        let resolvedAppGroupIdentifier = appGroupIdentifier?.isEmpty == false ? appGroupIdentifier : nil
 
         return AppConfig(
             apiBaseURL: resolvedAPIBaseURL,
@@ -42,7 +45,8 @@ struct AppConfig: Hashable, Sendable {
             requestTimeout: 20,
             appDisplayName: displayName,
             appVersion: appVersion,
-            buildNumber: buildNumber
+            buildNumber: buildNumber,
+            appGroupIdentifier: resolvedAppGroupIdentifier
         )
     }
 }

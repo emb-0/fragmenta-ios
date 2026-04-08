@@ -5,6 +5,8 @@ import Foundation
 final class AppState: ObservableObject {
     @Published var selectedTab: RootTab = .library
     @Published private(set) var container: AppContainer
+    @Published private(set) var pendingIncomingImportDraft: IncomingImportDraft?
+    @Published private(set) var pendingIncomingImportErrorMessage: String?
 
     private let preferencesStore: AppPreferencesStore
 
@@ -26,14 +28,61 @@ final class AppState: ObservableObject {
         container = AppContainer.live(preferencesStore: preferencesStore)
     }
 
+    func refreshPendingSharedImportIfAvailable() async {
+        guard let draft = await container.sharedImportStore.loadPendingDraft() else {
+            return
+        }
+
+        pendingIncomingImportDraft = draft
+        pendingIncomingImportErrorMessage = nil
+        selectedTab = .importer
+
+        try? await container.sharedImportStore.clearPendingDraft()
+    }
+
+    func handleIncomingURL(_ url: URL) async {
+        do {
+            let draft = try TextImportLoader.draft(from: url, source: .filesApp)
+            pendingIncomingImportDraft = draft
+            pendingIncomingImportErrorMessage = nil
+        } catch {
+            pendingIncomingImportErrorMessage = Self.errorMessage(for: error)
+        }
+
+        selectedTab = .importer
+    }
+
+    func consumePendingIncomingImportDraft() {
+        pendingIncomingImportDraft = nil
+    }
+
+    func dismissPendingIncomingImportError() {
+        pendingIncomingImportErrorMessage = nil
+    }
+
     func clearCachedData() async throws {
         try await container.cacheStore.removeAll()
+        try? await container.sharedImportStore.clearPendingDraft()
         preferencesStore.clearRecentSearches()
+        pendingIncomingImportDraft = nil
+        pendingIncomingImportErrorMessage = nil
         container.diagnosticsStore.record(
             event: .cache,
             status: .success,
-            detail: "Cleared local cache store."
+            detail: "Cleared local cache store and pending shared import drafts."
         )
+    }
+
+    private static func errorMessage(for error: Error) -> String {
+        if let localizedError = error as? LocalizedError, let description = localizedError.errorDescription {
+            return description
+        }
+
+        if let apiError = error as? APIError {
+            return apiError.message
+        }
+
+        return "Fragmenta could not open that incoming document."
     }
 }
 

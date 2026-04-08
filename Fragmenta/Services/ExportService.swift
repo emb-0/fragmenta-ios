@@ -2,6 +2,7 @@ import Foundation
 
 protocol ExportServiceProtocol {
     func exportLibrary(format: ExportFormat) async throws -> ExportArtifact
+    func exportBook(bookID: String, format: ExportFormat) async throws -> ExportArtifact
 }
 
 struct ExportService: ExportServiceProtocol {
@@ -17,14 +18,31 @@ struct ExportService: ExportServiceProtocol {
     }
 
     func exportLibrary(format: ExportFormat) async throws -> ExportArtifact {
+        try await export(scope: .library, format: format)
+    }
+
+    func exportBook(bookID: String, format: ExportFormat) async throws -> ExportArtifact {
+        try await export(scope: .book(bookID: bookID), format: format)
+    }
+
+    private func export(scope: ExportScope, format: ExportFormat) async throws -> ExportArtifact {
         do {
-            let response = try await apiClient.download(path: format.path)
-            let filename = response.filename ?? "fragmenta-export-\(ISO8601DateFormatter().string(from: .now)).\(format.fileExtension)"
+            let response = try await apiClient.download(path: format.path, queryItems: scope.queryItems)
+            let scopeDescriptor: String
+            switch scope {
+            case .library:
+                scopeDescriptor = "library"
+            case .book(let bookID):
+                scopeDescriptor = "book-\(bookID)"
+            }
+
+            let filename = response.filename ?? "fragmenta-\(scopeDescriptor)-\(ISO8601DateFormatter().string(from: .now)).\(format.fileExtension)"
             let fileURL = FileManager.default.temporaryDirectory.appendingPathComponent(filename)
             try response.data.write(to: fileURL, options: .atomic)
 
             let artifact = ExportArtifact(
                 format: format,
+                scope: scope,
                 fileURL: fileURL,
                 generatedAt: .now,
                 byteCount: response.data.count

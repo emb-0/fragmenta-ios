@@ -1,7 +1,9 @@
 import SwiftUI
 
 struct BookDetailView: View {
+    @EnvironmentObject private var appState: AppState
     @StateObject private var viewModel: BookDetailViewModel
+    @State private var markdownExportState: LoadableState<ExportArtifact> = .idle
 
     init(
         bookID: String,
@@ -39,7 +41,7 @@ struct BookDetailView: View {
             .task {
                 viewModel.loadIfNeeded()
             }
-            .onChange(of: viewModel.focusedHighlightID) { focusedHighlightID in
+            .onChange(of: viewModel.focusedHighlightID, initial: false) { _, focusedHighlightID in
                 guard let focusedHighlightID else {
                     return
                 }
@@ -77,6 +79,13 @@ struct BookDetailView: View {
                         detail: detail,
                         isShowingFocusedContext: viewModel.focusedHighlightID != nil
                     )
+
+                    BookDetailActionStrip(
+                        exportState: markdownExportState,
+                        generateMarkdown: {
+                            generateMarkdownExport(for: detail.book.id)
+                        }
+                    )
                 }
 
                 if case .failed(let message, let previous) = viewModel.detailState, previous != nil {
@@ -98,7 +107,9 @@ struct BookDetailView: View {
                             .foregroundStyle(FragmentaColor.textSecondary)
                     }
 
-                    if highlights.isEmpty {
+                    if case .failed(let message, let previous) = viewModel.highlightsState, previous == nil {
+                        DetailStatusCard(title: "Highlights unavailable", message: message)
+                    } else if highlights.isEmpty {
                         DetailStatusCard(
                             title: "No highlights yet",
                             message: "This book is present in the library, but fragmenta-core has not returned any saved passages yet."
@@ -107,6 +118,7 @@ struct BookDetailView: View {
                         ForEach(highlights) { highlight in
                             HighlightCardView(
                                 highlight: highlight,
+                                citation: highlightCitation(for: highlight, in: detail),
                                 isFocused: highlight.id == viewModel.focusedHighlightID
                             )
                             .id(highlight.id)
@@ -118,6 +130,13 @@ struct BookDetailView: View {
 
                     if viewModel.isLoadingMore {
                         LoadMoreHighlightsFooter()
+                    } else if let loadMoreFailureMessage = viewModel.loadMoreFailureMessage {
+                        LoadMoreRetryFooter(
+                            message: loadMoreFailureMessage,
+                            retryAction: {
+                                viewModel.retryLoadMore()
+                            }
+                        )
                     } else if viewModel.pageInfo.hasMore == false, highlights.isEmpty == false {
                         Text("End of notebook")
                             .font(FragmentaTypography.metadata)
@@ -128,6 +147,45 @@ struct BookDetailView: View {
                 }
             }
         }
+    }
+
+    private func highlightCitation(for highlight: Highlight, in detail: BookDetail) -> HighlightCitation {
+        HighlightCitation(
+            bookTitle: detail.book.title,
+            author: detail.book.author,
+            chapter: highlight.chapter,
+            locationLabel: highlight.locationLabel
+        )
+    }
+
+    private func generateMarkdownExport(for bookID: String) {
+        markdownExportState = .loading(previous: markdownExportState.value)
+
+        Task { @MainActor in
+            do {
+                let artifact = try await appState.container.exportService.exportBook(
+                    bookID: bookID,
+                    format: .markdown
+                )
+                markdownExportState = .loaded(artifact, source: .remote)
+            } catch is CancellationError {
+                return
+            } catch {
+                markdownExportState = .failed(Self.errorMessage(for: error), previous: markdownExportState.value)
+            }
+        }
+    }
+
+    private static func errorMessage(for error: Error) -> String {
+        if let apiError = error as? APIError {
+            return apiError.message
+        }
+
+        if let localizedError = error as? LocalizedError, let description = localizedError.errorDescription {
+            return description
+        }
+
+        return "Book export is temporarily unavailable."
     }
 }
 
@@ -269,6 +327,69 @@ private struct DetailStatusCard: View {
     }
 }
 
+private struct BookDetailActionStrip: View {
+    let exportState: LoadableState<ExportArtifact>
+    let generateMarkdown: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: FragmentaSpacing.small) {
+            Text("Actions")
+                .font(FragmentaTypography.eyebrow)
+                .foregroundStyle(FragmentaColor.textTertiary)
+                .tracking(1.2)
+
+            HStack(spacing: FragmentaSpacing.small) {
+                switch exportState {
+                case .idle, .failed:
+                    Button("Export Markdown") {
+                        generateMarkdown()
+                    }
+                    .fragmentaAdaptiveGlassButton()
+                case .loading:
+                    HStack(spacing: FragmentaSpacing.small) {
+                        ProgressView()
+                            .tint(FragmentaColor.textPrimary)
+                        Text("Preparing Markdown")
+                            .font(FragmentaTypography.metadata)
+                            .foregroundStyle(FragmentaColor.textSecondary)
+                    }
+                    .chipSurfaceStyle()
+                case .loaded(let artifact, _):
+                    ShareLink(item: artifact.fileURL) {
+                        Text("Share Markdown")
+                            .font(FragmentaTypography.metadata)
+                            .foregroundStyle(FragmentaColor.textPrimary)
+                            .chipSurfaceStyle()
+                    }
+
+                    Button("Refresh Export") {
+                        generateMarkdown()
+                    }
+                    .fragmentaAdaptiveGlassButton()
+                }
+
+                Spacer(minLength: 0)
+            }
+
+            switch exportState {
+            case .loaded(let artifact, _):
+                Text(artifact.fileURL.lastPathComponent)
+                    .font(FragmentaTypography.metadata)
+                    .foregroundStyle(FragmentaColor.textSecondary)
+            case .failed(let message, _):
+                Text(message)
+                    .font(FragmentaTypography.metadata)
+                    .foregroundStyle(FragmentaColor.negative)
+            default:
+                Text("Prepare a book-level markdown export from fragmenta-core and hand it off through the native share sheet.")
+                    .font(FragmentaTypography.metadata)
+                    .foregroundStyle(FragmentaColor.textSecondary)
+            }
+        }
+        .sectionSurfaceStyle()
+    }
+}
+
 private struct LoadMoreHighlightsFooter: View {
     var body: some View {
         HStack(spacing: FragmentaSpacing.small) {
@@ -284,6 +405,27 @@ private struct LoadMoreHighlightsFooter: View {
     }
 }
 
+private struct LoadMoreRetryFooter: View {
+    let message: String
+    let retryAction: () -> Void
+
+    var body: some View {
+        VStack(alignment: .center, spacing: FragmentaSpacing.small) {
+            Text(message)
+                .font(FragmentaTypography.metadata)
+                .foregroundStyle(FragmentaColor.textSecondary)
+                .multilineTextAlignment(.center)
+
+            Button("Retry") {
+                retryAction()
+            }
+            .fragmentaAdaptiveGlassButton()
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, FragmentaSpacing.medium)
+    }
+}
+
 #if DEBUG
 struct BookDetailView_Previews: PreviewProvider {
     static var previews: some View {
@@ -294,6 +436,7 @@ struct BookDetailView_Previews: PreviewProvider {
                 booksService: PreviewBooksService()
             )
         }
+        .environmentObject(AppState(container: .preview))
     }
 }
 #endif

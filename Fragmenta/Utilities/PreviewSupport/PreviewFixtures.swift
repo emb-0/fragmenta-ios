@@ -191,6 +191,7 @@ enum PreviewFixtures {
 
     static let exportArtifact = ExportArtifact(
         format: .markdown,
+        scope: .library,
         fileURL: URL(fileURLWithPath: "/tmp/fragmenta-preview.md"),
         generatedAt: Date(),
         byteCount: 4_096

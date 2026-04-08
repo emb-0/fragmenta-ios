@@ -6,6 +6,16 @@ struct ImportedTextFile: Identifiable, Hashable, Sendable {
     let filename: String
     let rawText: String
     let byteCount: Int
+    let source: IncomingImportDraft.Source
+    let receivedAt: Date
+
+    init(draft: IncomingImportDraft) {
+        self.filename = draft.displayFilename
+        self.rawText = draft.rawText
+        self.byteCount = draft.byteCount
+        self.source = draft.source
+        self.receivedAt = draft.receivedAt
+    }
 }
 
 @MainActor
@@ -43,6 +53,7 @@ final class ImportViewModel: ObservableObject {
         }
     }
     @Published private(set) var importedFile: ImportedTextFile?
+    @Published private(set) var intakeSourceSummary: String?
     @Published private(set) var workflowState: WorkflowState = .idle
     @Published private(set) var historyState: LoadableState<[ImportRecord]> = .idle
     @Published private(set) var selectedHistoryRecord: ImportRecord?
@@ -92,6 +103,14 @@ final class ImportViewModel: ObservableObject {
         Task { [weak self] in
             await self?.loadDocument(url)
         }
+    }
+
+    func applyIncomingDraft(_ draft: IncomingImportDraft) {
+        importedFile = ImportedTextFile(draft: draft)
+        intakeSourceSummary = draft.source.title
+        sourceMode = draft.preferredSourceMode == .file ? .file : .paste
+        rawText = draft.rawText
+        workflowState = .editing
     }
 
     func previewImport() {
@@ -144,34 +163,16 @@ final class ImportViewModel: ObservableObject {
     func reset() {
         rawText = ""
         importedFile = nil
+        intakeSourceSummary = nil
         workflowState = .idle
     }
 
     private func loadDocument(_ url: URL) async {
-        let didStartSecurityScope = url.startAccessingSecurityScopedResource()
-        defer {
-            if didStartSecurityScope {
-                url.stopAccessingSecurityScopedResource()
-            }
-        }
-
         do {
-            let data = try Data(contentsOf: url)
-            guard let rawText = Self.decodeText(from: data) else {
-                workflowState = .failure("The selected file could not be decoded as text.")
-                return
-            }
-
-            importedFile = ImportedTextFile(
-                filename: url.lastPathComponent,
-                rawText: rawText,
-                byteCount: data.count
-            )
-            sourceMode = .file
-            self.rawText = rawText
-            workflowState = .editing
+            let draft = try TextImportLoader.draft(from: url, source: .documentPicker)
+            applyIncomingDraft(draft)
         } catch {
-            workflowState = .failure("The selected file could not be opened.")
+            workflowState = .failure(Self.errorMessage(for: error))
         }
     }
 
@@ -284,22 +285,14 @@ final class ImportViewModel: ObservableObject {
     }
 
     private static func errorMessage(for error: Error) -> String {
+        if let localizedError = error as? LocalizedError, let description = localizedError.errorDescription {
+            return description
+        }
+
         if let apiError = error as? APIError {
             return apiError.message
         }
 
         return "The import flow hit an unexpected problem."
-    }
-
-    private static func decodeText(from data: Data) -> String? {
-        let candidateEncodings: [String.Encoding] = [.utf8, .utf16, .unicode, .ascii, .windowsCP1252]
-
-        for encoding in candidateEncodings {
-            if let string = String(data: data, encoding: encoding) {
-                return string
-            }
-        }
-
-        return nil
     }
 }

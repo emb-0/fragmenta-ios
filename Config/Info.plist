@@ -20,9 +20,29 @@
     <string>$(MARKETING_VERSION)</string>
     <key>CFBundleVersion</key>
     <string>$(CURRENT_PROJECT_VERSION)</string>
+    <key>CFBundleDocumentTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleTypeName</key>
+            <string>Plain Text</string>
+            <key>CFBundleTypeRole</key>
+            <string>Editor</string>
+            <key>LSHandlerRank</key>
+            <string>Alternate</string>
+            <key>LSItemContentTypes</key>
+            <array>
+                <string>public.plain-text</string>
+                <string>public.text</string>
+            </array>
+        </dict>
+    </array>
     <key>FragmentaAPIBaseURL</key>
     <string>$(FRAGMENTA_API_BASE_URL)</string>
+    <key>FragmentaAppGroupIdentifier</key>
+    <string>$(FRAGMENTA_APP_GROUP_IDENTIFIER)</string>
     <key>LSRequiresIPhoneOS</key>
+    <true/>
+    <key>LSSupportsOpeningDocumentsInPlace</key>
     <true/>
     <key>NSAppTransportSecurity</key>
     <dict>

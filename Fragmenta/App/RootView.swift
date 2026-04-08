@@ -38,6 +38,7 @@ struct RootView: View {
                 SettingsView(
                     config: container.config,
                     exportService: container.exportService,
+                    importService: container.importService,
                     diagnosticsStore: container.diagnosticsStore
                 )
             }

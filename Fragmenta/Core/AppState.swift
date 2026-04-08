@@ -1,7 +1,40 @@
+import Combine
 import Foundation
 
+@MainActor
 final class AppState: ObservableObject {
     @Published var selectedTab: RootTab = .library
+    @Published private(set) var container: AppContainer
+
+    private let preferencesStore: AppPreferencesStore
+
+    init(
+        preferencesStore: AppPreferencesStore = AppPreferencesStore(),
+        container: AppContainer? = nil
+    ) {
+        self.preferencesStore = preferencesStore
+        self.container = container ?? AppContainer.live(preferencesStore: preferencesStore)
+    }
+
+    var developmentBaseURLOverride: String {
+        preferencesStore.developmentBaseURLOverride ?? ""
+    }
+
+    func applyDevelopmentBaseURLOverride(_ rawValue: String) {
+        let trimmed = rawValue.trimmed
+        preferencesStore.developmentBaseURLOverride = trimmed.isEmpty ? nil : trimmed
+        container = AppContainer.live(preferencesStore: preferencesStore)
+    }
+
+    func clearCachedData() async throws {
+        try await container.cacheStore.removeAll()
+        preferencesStore.clearRecentSearches()
+        container.diagnosticsStore.record(
+            event: .cache,
+            status: .success,
+            detail: "Cleared local cache store."
+        )
+    }
 }
 
 enum RootTab: String, CaseIterable, Hashable, Identifiable {

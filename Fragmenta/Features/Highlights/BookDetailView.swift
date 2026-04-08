@@ -3,72 +3,111 @@ import SwiftUI
 struct BookDetailView: View {
     @StateObject private var viewModel: BookDetailViewModel
 
-    init(bookID: String, booksService: BooksServiceProtocol) {
-        _viewModel = StateObject(wrappedValue: BookDetailViewModel(bookID: bookID, booksService: booksService))
+    init(
+        bookID: String,
+        focusHighlightID: String? = nil,
+        booksService: BooksServiceProtocol
+    ) {
+        _viewModel = StateObject(
+            wrappedValue: BookDetailViewModel(
+                bookID: bookID,
+                focusHighlightID: focusHighlightID,
+                booksService: booksService
+            )
+        )
     }
 
     var body: some View {
-        FragmentaScreenBackground {
-            ScrollView {
-                VStack(alignment: .leading, spacing: FragmentaSpacing.xLarge) {
-                    detailContent
+        ScrollViewReader { proxy in
+            FragmentaScreenBackground {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: FragmentaSpacing.xLarge) {
+                        detailContent
+                    }
+                    .padding(.horizontal, FragmentaSpacing.large)
+                    .padding(.top, FragmentaSpacing.large)
+                    .padding(.bottom, FragmentaSpacing.xxLarge)
                 }
-                .padding(.horizontal, FragmentaSpacing.large)
-                .padding(.top, FragmentaSpacing.large)
-                .padding(.bottom, FragmentaSpacing.xxLarge)
+                .scrollIndicators(.hidden)
+                .refreshable {
+                    viewModel.refresh()
+                }
             }
-            .scrollIndicators(.hidden)
-            .refreshable {
-                await viewModel.refresh()
+            .navigationTitle("Book")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(.hidden, for: .navigationBar)
+            .task {
+                viewModel.loadIfNeeded()
             }
-        }
-        .navigationTitle("Book")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(.hidden, for: .navigationBar)
-        .task {
-            await viewModel.loadIfNeeded()
+            .onChange(of: viewModel.focusedHighlightID) { focusedHighlightID in
+                guard let focusedHighlightID else {
+                    return
+                }
+
+                withAnimation(.easeInOut(duration: 0.28)) {
+                    proxy.scrollTo(focusedHighlightID, anchor: .center)
+                }
+            }
         }
     }
 
     @ViewBuilder
     private var detailContent: some View {
-        switch viewModel.state {
-        case .idle, .loading:
-            VStack(spacing: FragmentaSpacing.medium) {
-                ProgressView()
-                    .tint(FragmentaColor.textPrimary)
+        let detail = viewModel.detailState.value
+        let highlights = viewModel.highlightsState.value ?? []
 
-                Text("Loading book details...")
-                    .font(FragmentaTypography.subheadline)
-                    .foregroundStyle(FragmentaColor.textSecondary)
+        if detail == nil && highlights.isEmpty {
+            switch viewModel.detailState {
+            case .idle, .loading:
+                VStack(spacing: FragmentaSpacing.large) {
+                    BookDetailHeroSkeletonView()
+                    ForEach(0 ..< 2, id: \.self) { _ in
+                        HighlightCardSkeletonView()
+                    }
+                }
+            case .failed(let message, _):
+                DetailStatusCard(title: "Book unavailable", message: message)
+            case .loaded:
+                EmptyView()
             }
-            .frame(maxWidth: .infinity)
-            .padding(.top, FragmentaSpacing.xxLarge)
-
-        case .failed(let message):
-            VStack(alignment: .leading, spacing: FragmentaSpacing.medium) {
-                Text("Book unavailable")
-                    .font(FragmentaTypography.sectionTitle)
-                    .foregroundStyle(FragmentaColor.textPrimary)
-
-                Text(message)
-                    .font(FragmentaTypography.body)
-                    .foregroundStyle(FragmentaColor.textSecondary)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .sectionSurfaceStyle()
-
-        case .loaded(let detail):
+        } else {
             VStack(alignment: .leading, spacing: FragmentaSpacing.xLarge) {
-                BookDetailHeroView(detail: detail)
+                if let detail {
+                    BookDetailHeroView(
+                        detail: detail,
+                        isShowingFocusedContext: viewModel.focusedHighlightID != nil
+                    )
+                }
+
+                if case .failed(let message, let previous) = viewModel.detailState, previous != nil {
+                    DetailStatusCard(title: "Showing saved book detail", message: message)
+                }
+
+                if case .failed(let message, let previous) = viewModel.highlightsState, previous != nil {
+                    DetailStatusCard(title: "Showing saved highlights", message: message)
+                }
 
                 VStack(alignment: .leading, spacing: FragmentaSpacing.large) {
                     Text("Highlights")
                         .font(FragmentaTypography.sectionTitle)
                         .foregroundStyle(FragmentaColor.textPrimary)
 
-                    ForEach(detail.highlights) { highlight in
-                        HighlightCardView(highlight: highlight)
+                    ForEach(highlights) { highlight in
+                        HighlightCardView(
+                            highlight: highlight,
+                            isFocused: highlight.id == viewModel.focusedHighlightID
+                        )
+                        .id(highlight.id)
+                        .onAppear {
+                            viewModel.loadMoreIfNeeded(currentHighlight: highlight)
+                        }
+                    }
+
+                    if viewModel.isLoadingMore {
+                        ProgressView()
+                            .tint(FragmentaColor.textPrimary)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, FragmentaSpacing.medium)
                     }
                 }
             }
@@ -78,10 +117,18 @@ struct BookDetailView: View {
 
 private struct BookDetailHeroView: View {
     let detail: BookDetail
+    let isShowingFocusedContext: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: FragmentaSpacing.large) {
             VStack(alignment: .leading, spacing: FragmentaSpacing.small) {
+                if isShowingFocusedContext {
+                    Text("SEARCH CONTEXT")
+                        .font(FragmentaTypography.eyebrow)
+                        .foregroundStyle(FragmentaColor.accentSoft)
+                        .tracking(1.3)
+                }
+
                 Text(detail.book.title)
                     .font(FragmentaTypography.display)
                     .foregroundStyle(FragmentaColor.textPrimary)
@@ -127,11 +174,57 @@ private struct BookDetailHeroView: View {
     }
 }
 
+private struct BookDetailHeroSkeletonView: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: FragmentaSpacing.large) {
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(FragmentaColor.surfaceOverlay)
+                .frame(width: 140, height: 12)
+
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(FragmentaColor.surfaceOverlay)
+                .frame(height: 40)
+
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(FragmentaColor.surfaceOverlay)
+                .frame(width: 180, height: 18)
+
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(FragmentaColor.surfaceOverlay)
+                .frame(height: 72)
+        }
+        .redacted(reason: .placeholder)
+        .journalCardStyle()
+    }
+}
+
+private struct DetailStatusCard: View {
+    let title: String
+    let message: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: FragmentaSpacing.small) {
+            Text(title)
+                .font(FragmentaTypography.sectionTitle)
+                .foregroundStyle(FragmentaColor.textPrimary)
+
+            Text(message)
+                .font(FragmentaTypography.body)
+                .foregroundStyle(FragmentaColor.textSecondary)
+        }
+        .sectionSurfaceStyle()
+    }
+}
+
 #if DEBUG
 struct BookDetailView_Previews: PreviewProvider {
     static var previews: some View {
         NavigationStack {
-            BookDetailView(bookID: PreviewFixtures.books[0].id, booksService: PreviewBooksService())
+            BookDetailView(
+                bookID: PreviewFixtures.books[0].id,
+                focusHighlightID: PreviewFixtures.highlights[0].id,
+                booksService: PreviewBooksService()
+            )
         }
     }
 }

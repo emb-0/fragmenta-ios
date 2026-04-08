@@ -1,5 +1,11 @@
 import Foundation
 
+struct DownloadedResponse: Sendable {
+    let data: Data
+    let filename: String?
+    let mimeType: String?
+}
+
 final class APIClient {
     private let config: AppConfig
     private let session: URLSession
@@ -24,32 +30,83 @@ final class APIClient {
     }
 
     func request<Response: Decodable & Sendable>(_ endpoint: APIEndpoint<Response>) async throws -> Response {
+        let execution = try await performRequest(
+            path: endpoint.path,
+            method: endpoint.method,
+            queryItems: endpoint.queryItems,
+            headers: endpoint.headers,
+            body: endpoint.body
+        )
+
+        if (200 ..< 300).contains(execution.response.statusCode) {
+            do {
+                if endpoint.unwrapEnvelope {
+                    return try decoder.decode(APIEnvelope<Response>.self, from: execution.data).data
+                } else {
+                    return try decoder.decode(Response.self, from: execution.data)
+                }
+            } catch {
+                throw APIError.decoding(error)
+            }
+        }
+
+        throw mappedError(data: execution.data, response: execution.response)
+    }
+
+    func download(path: String, queryItems: [URLQueryItem] = []) async throws -> DownloadedResponse {
+        let execution = try await performRequest(
+            path: path,
+            method: .get,
+            queryItems: queryItems,
+            headers: [:],
+            body: nil
+        )
+
+        if (200 ..< 300).contains(execution.response.statusCode) {
+            let contentDisposition = execution.response.value(forHTTPHeaderField: "Content-Disposition")
+            return DownloadedResponse(
+                data: execution.data,
+                filename: contentDisposition?.fragmentaSuggestedFilename,
+                mimeType: execution.response.value(forHTTPHeaderField: "Content-Type")
+            )
+        }
+
+        throw mappedError(data: execution.data, response: execution.response)
+    }
+
+    private func performRequest(
+        path: String,
+        method: HTTPMethod,
+        queryItems: [URLQueryItem],
+        headers: [String: String],
+        body: AnyEncodable?
+    ) async throws -> (data: Data, response: HTTPURLResponse) {
         guard
             var components = URLComponents(
-                url: resolvedURL(for: endpoint.path),
+                url: resolvedURL(for: path),
                 resolvingAgainstBaseURL: false
             )
         else {
-            throw APIError.invalidURL(endpoint.path)
+            throw APIError.invalidURL(path)
         }
 
-        components.queryItems = endpoint.queryItems.isEmpty ? nil : endpoint.queryItems
+        components.queryItems = queryItems.isEmpty ? nil : queryItems
 
         guard let url = components.url else {
-            throw APIError.invalidURL(endpoint.path)
+            throw APIError.invalidURL(path)
         }
 
         var request = URLRequest(url: url)
-        request.httpMethod = endpoint.method.rawValue
+        request.httpMethod = method.rawValue
         request.timeoutInterval = config.requestTimeout
         request.setValue("application/json", forHTTPHeaderField: "Accept")
 
-        let providerHeaders = await headersProvider.headers(for: endpoint.path)
-        for (field, value) in providerHeaders.merging(endpoint.headers, uniquingKeysWith: { _, endpointValue in endpointValue }) {
+        let providerHeaders = await headersProvider.headers(for: path)
+        for (field, value) in providerHeaders.merging(headers, uniquingKeysWith: { _, endpointValue in endpointValue }) {
             request.setValue(value, forHTTPHeaderField: field)
         }
 
-        if let body = endpoint.body {
+        if let body {
             request.httpBody = try encoder.encode(body)
         }
 
@@ -58,11 +115,10 @@ final class APIClient {
 
         do {
             (data, response) = try await session.data(for: request)
+        } catch is CancellationError {
+            throw CancellationError()
         } catch {
-            throw APIError.transport(
-                statusCode: -1,
-                message: error.localizedDescription
-            )
+            throw mapTransportError(error)
         }
 
         guard let httpResponse = response as? HTTPURLResponse else {
@@ -72,27 +128,41 @@ final class APIClient {
             )
         }
 
-        if (200 ..< 300).contains(httpResponse.statusCode) {
-            do {
-                if endpoint.unwrapEnvelope {
-                    return try decoder.decode(APIEnvelope<Response>.self, from: data).data
-                } else {
-                    return try decoder.decode(Response.self, from: data)
-                }
-            } catch {
-                throw APIError.decoding(error)
+        return (data, httpResponse)
+    }
+
+    private func mapTransportError(_ error: Error) -> APIError {
+        if let urlError = error as? URLError {
+            switch urlError.code {
+            case .cancelled:
+                return .cancelled()
+            case .notConnectedToInternet, .networkConnectionLost, .cannotConnectToHost, .cannotFindHost, .timedOut:
+                return .offline(urlError)
+            default:
+                return .transport(statusCode: urlError.errorCode, message: urlError.localizedDescription)
             }
         }
 
-        let requestID = httpResponse.value(forHTTPHeaderField: "x-request-id")
-        let decodedError = try? decoder.decode(APIErrorEnvelope.self, from: data).error
+        return .transport(statusCode: -1, message: error.localizedDescription)
+    }
 
-        throw APIError(
-            code: decodedError?.code ?? "http_\(httpResponse.statusCode)",
-            message: decodedError?.message ?? HTTPURLResponse.localizedString(forStatusCode: httpResponse.statusCode),
+    private func mappedError(data: Data, response: HTTPURLResponse) -> APIError {
+        let requestID = response.value(forHTTPHeaderField: "x-request-id")
+        let decodedError = try? decoder.decode(APIErrorEnvelope.self, from: data).error
+        let fallbackMessage = String(data: data, encoding: .utf8)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let fallbackPreview = fallbackMessage.map { String($0.prefix(220)) }
+
+        let resolvedMessage = decodedError?.message
+            ?? fallbackPreview
+            ?? HTTPURLResponse.localizedString(forStatusCode: response.statusCode)
+
+        return APIError(
+            code: decodedError?.code ?? "http_\(response.statusCode)",
+            message: resolvedMessage,
             details: decodedError?.details,
             requestID: decodedError?.requestID ?? requestID,
-            statusCode: decodedError?.statusCode ?? httpResponse.statusCode
+            statusCode: decodedError?.statusCode ?? response.statusCode
         )
     }
 
@@ -105,7 +175,7 @@ final class APIClient {
     }
 }
 
-private extension JSONDecoder {
+extension JSONDecoder {
     static let fragmenta: JSONDecoder = {
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
@@ -126,7 +196,7 @@ private extension JSONDecoder {
     }()
 }
 
-private extension JSONEncoder {
+extension JSONEncoder {
     static let fragmenta: JSONEncoder = {
         let encoder = JSONEncoder()
         encoder.keyEncodingStrategy = .convertToSnakeCase
@@ -147,4 +217,20 @@ private enum DateParser {
         formatter.formatOptions = [.withInternetDateTime]
         return formatter
     }()
+}
+
+private extension String {
+    var fragmentaSuggestedFilename: String? {
+        let parts = components(separatedBy: ";")
+        for part in parts {
+            let trimmed = part.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.lowercased().hasPrefix("filename=") {
+                return trimmed
+                    .replacingOccurrences(of: "filename=", with: "")
+                    .trimmingCharacters(in: CharacterSet(charactersIn: "\""))
+            }
+        }
+
+        return nil
+    }
 }

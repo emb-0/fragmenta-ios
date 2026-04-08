@@ -1,36 +1,82 @@
+import Combine
 import Foundation
 
 @MainActor
 final class LibraryViewModel: ObservableObject {
     @Published private(set) var state: LoadableState<[Book]> = .idle
+    @Published private(set) var query = LibraryQuery()
 
     private let booksService: BooksServiceProtocol
+    private var loadTask: Task<Void, Never>?
 
     init(booksService: BooksServiceProtocol) {
         self.booksService = booksService
     }
 
-    func loadIfNeeded() async {
+    deinit {
+        loadTask?.cancel()
+    }
+
+    func loadIfNeeded() {
         if case .idle = state {
-            await load()
+            load()
         }
     }
 
-    func refresh() async {
-        await load()
+    func refresh() {
+        load()
     }
 
-    private func load() async {
-        if state.isLoading {
-            return
-        }
+    func updateSort(_ sort: LibraryQuery.Sort) {
+        query.sort = sort
+        load()
+    }
 
-        state = .loading
+    func updateSource(_ source: LibraryQuery.SourceFilter) {
+        query.source = source
+        load()
+    }
+
+    func toggleRecentOnly() {
+        query.recentOnly.toggle()
+        load()
+    }
+
+    func toggleHasNotesOnly() {
+        query.hasNotesOnly.toggle()
+        load()
+    }
+
+    private func load() {
+        loadTask?.cancel()
+        loadTask = Task { [weak self] in
+            await self?.performLoad()
+        }
+    }
+
+    private func performLoad() async {
+        let cachedBooks = await booksService.loadCachedBooks(query: query)
+        let previousBooks = state.value ?? cachedBooks
+
+        if let previousBooks {
+            state = .loading(previous: previousBooks)
+        } else {
+            state = .loading()
+        }
 
         do {
-            state = .loaded(try await booksService.fetchBooks())
+            let books = try await booksService.fetchBooks(query: query)
+            state = .loaded(books, source: .remote)
+        } catch is CancellationError {
+            return
         } catch {
-            state = .failed(Self.errorMessage(for: error))
+            if let previousBooks {
+                state = .failed(Self.errorMessage(for: error), previous: previousBooks)
+            } else if let cachedBooks {
+                state = .loaded(cachedBooks, source: .cache)
+            } else {
+                state = .failed(Self.errorMessage(for: error))
+            }
         }
     }
 

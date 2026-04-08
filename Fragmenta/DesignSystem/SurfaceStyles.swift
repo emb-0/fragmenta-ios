@@ -62,6 +62,22 @@ struct ChipSurfaceModifier: ViewModifier {
     }
 }
 
+struct FieldSurfaceModifier: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .padding(.horizontal, FragmentaSpacing.medium)
+            .padding(.vertical, FragmentaSpacing.medium)
+            .background(
+                RoundedRectangle(cornerRadius: FragmentaRadius.medium, style: .continuous)
+                    .fill(FragmentaColor.surfaceSecondary)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: FragmentaRadius.medium, style: .continuous)
+                            .stroke(Color.white.opacity(0.05), lineWidth: 1)
+                    )
+            )
+    }
+}
+
 struct PaperGlassCardModifier: ViewModifier {
     let tint: Color?
 
@@ -103,6 +119,10 @@ extension View {
 
     func chipSurfaceStyle() -> some View {
         modifier(ChipSurfaceModifier())
+    }
+
+    func fieldSurfaceStyle() -> some View {
+        modifier(FieldSurfaceModifier())
     }
 
     func paperGlassCardStyle(tint: Color? = FragmentaColor.accent.opacity(0.14)) -> some View {

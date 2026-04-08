@@ -3,9 +3,9 @@ import SwiftUI
 struct RootView: View {
     @EnvironmentObject private var appState: AppState
 
-    let container: AppContainer
-
     var body: some View {
+        let container = appState.container
+
         TabView(selection: $appState.selectedTab) {
             NavigationStack {
                 LibraryView(booksService: container.booksService)
@@ -27,7 +27,7 @@ struct RootView: View {
             .tag(RootTab.search)
 
             NavigationStack {
-                ImportView(highlightService: container.highlightService)
+                ImportView(importService: container.importService)
             }
             .tabItem {
                 Label(RootTab.importer.title, systemImage: RootTab.importer.systemImage)
@@ -35,7 +35,11 @@ struct RootView: View {
             .tag(RootTab.importer)
 
             NavigationStack {
-                SettingsView(config: container.config)
+                SettingsView(
+                    config: container.config,
+                    exportService: container.exportService,
+                    diagnosticsStore: container.diagnosticsStore
+                )
             }
             .tabItem {
                 Label(RootTab.settings.title, systemImage: RootTab.settings.systemImage)
@@ -52,8 +56,8 @@ struct RootView: View {
 #if DEBUG
 struct RootView_Previews: PreviewProvider {
     static var previews: some View {
-        RootView(container: .preview)
-            .environmentObject(AppState())
+        RootView()
+            .environmentObject(AppState(container: .preview))
     }
 }
 #endif

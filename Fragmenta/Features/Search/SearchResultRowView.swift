@@ -15,16 +15,23 @@ struct SearchResultRowView: View {
                     .foregroundStyle(FragmentaColor.textSecondary)
             }
 
-            Text("“\(result.highlight.text.trimmed)”")
+            Text("“\(result.displaySnippet)”")
                 .font(FragmentaTypography.body)
                 .foregroundStyle(FragmentaColor.textPrimary.opacity(0.9))
-                .lineLimit(4)
+                .lineLimit(5)
 
             HStack(spacing: FragmentaSpacing.small) {
                 if let locationLabel = result.highlight.locationLabel {
                     Text(locationLabel)
                         .font(FragmentaTypography.metadata)
                         .foregroundStyle(FragmentaColor.textSecondary)
+                }
+
+                if result.matchedInNote == true {
+                    Text("Note match")
+                        .font(FragmentaTypography.caption)
+                        .foregroundStyle(FragmentaColor.accentSoft)
+                        .chipSurfaceStyle()
                 }
 
                 Spacer()
@@ -36,6 +43,26 @@ struct SearchResultRowView: View {
                 }
             }
         }
+        .sectionSurfaceStyle()
+    }
+}
+
+struct SearchResultRowSkeletonView: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: FragmentaSpacing.medium) {
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(FragmentaColor.surfaceOverlay)
+                .frame(width: 180, height: 20)
+
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(FragmentaColor.surfaceOverlay)
+                .frame(width: 120, height: 16)
+
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(FragmentaColor.surfaceOverlay)
+                .frame(height: 68)
+        }
+        .redacted(reason: .placeholder)
         .sectionSurfaceStyle()
     }
 }

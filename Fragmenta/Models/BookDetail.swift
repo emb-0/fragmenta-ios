@@ -5,10 +5,11 @@ struct BookDetail: Codable, Identifiable, Hashable, Sendable {
         let highlightCount: Int
         let noteCount: Int
         let lastImportedAt: Date?
+        let firstHighlightAt: Date?
+        let latestHighlightAt: Date?
     }
 
     let book: Book
-    let highlights: [Highlight]
     let stats: Stats
 
     var id: String {

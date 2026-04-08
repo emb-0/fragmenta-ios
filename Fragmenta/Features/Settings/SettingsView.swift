@@ -24,15 +24,15 @@ struct SettingsView: View {
     var body: some View {
         FragmentaScreenBackground {
             ScrollView {
-                VStack(alignment: .leading, spacing: FragmentaSpacing.xLarge) {
+                VStack(alignment: .leading, spacing: FragmentaSpacing.xxLarge) {
                     FragmentaSectionHeader(
                         eyebrow: "Settings",
                         title: "App configuration",
-                        subtitle: "Sprint 2 exposes backend, cache, export, and diagnostics information without turning the app into a debug panel."
+                        subtitle: "A composed view into the app, the backend it speaks to, and the local shell state it keeps."
                     )
 
+                    aboutCard
                     backendCard
-                    appInfoCard
                     exportCard
                     diagnosticsCard
                     cacheCard
@@ -54,41 +54,56 @@ struct SettingsView: View {
         }
     }
 
+    private var aboutCard: some View {
+        VStack(alignment: .leading, spacing: FragmentaSpacing.medium) {
+            Text("About")
+                .font(FragmentaTypography.sectionTitle)
+                .foregroundStyle(FragmentaColor.textPrimary)
+
+            Text("Fragmenta is the native reading artifact for Kindle exports parsed by fragmenta-core. Sprint 3 makes the iOS client the most polished expression of the product family so far.")
+                .font(FragmentaTypography.body)
+                .foregroundStyle(FragmentaColor.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            LabeledSettingRow(label: "Name", value: config.appDisplayName)
+            LabeledSettingRow(label: "Version", value: config.appVersion)
+            LabeledSettingRow(label: "Build", value: config.buildNumber)
+            LabeledSettingRow(label: "Authentication", value: "Intentionally disabled for now.")
+        }
+        .sectionSurfaceStyle()
+    }
+
     private var backendCard: some View {
         VStack(alignment: .leading, spacing: FragmentaSpacing.medium) {
             Text("Backend")
                 .font(FragmentaTypography.sectionTitle)
                 .foregroundStyle(FragmentaColor.textPrimary)
 
+            Text("Fragmenta currently speaks to a public fragmenta-core API without auth. Debug builds can override the base URL locally.")
+                .font(FragmentaTypography.body)
+                .foregroundStyle(FragmentaColor.textSecondary)
+
             LabeledSettingRow(label: "Active", value: config.apiBaseURL.absoluteString, monospaced: true)
             LabeledSettingRow(label: "Default", value: config.defaultAPIBaseURL.absoluteString, monospaced: true)
 
 #if DEBUG
-            TextField("Development base URL override", text: $viewModel.baseURLOverrideDraft)
-                .font(FragmentaTypography.monospacedMetadata)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .fieldSurfaceStyle()
+            VStack(alignment: .leading, spacing: FragmentaSpacing.small) {
+                Text("Development override")
+                    .font(FragmentaTypography.metadata)
+                    .foregroundStyle(FragmentaColor.textSecondary)
 
-            Button("Apply Override") {
-                viewModel.applyBaseURLOverride(using: appState)
+                TextField("Development base URL override", text: $viewModel.baseURLOverrideDraft)
+                    .font(FragmentaTypography.monospacedMetadata)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .fieldSurfaceStyle()
+
+                Button("Apply Override") {
+                    viewModel.applyBaseURLOverride(using: appState)
+                }
+                .fragmentaAdaptiveGlassButton(prominent: true)
             }
-            .fragmentaAdaptiveGlassButton(prominent: true)
 #endif
-        }
-        .sectionSurfaceStyle()
-    }
-
-    private var appInfoCard: some View {
-        VStack(alignment: .leading, spacing: FragmentaSpacing.medium) {
-            Text("App")
-                .font(FragmentaTypography.sectionTitle)
-                .foregroundStyle(FragmentaColor.textPrimary)
-
-            LabeledSettingRow(label: "Name", value: config.appDisplayName)
-            LabeledSettingRow(label: "Version", value: config.appVersion)
-            LabeledSettingRow(label: "Build", value: config.buildNumber)
-            LabeledSettingRow(label: "Authentication", value: "Still disabled in Sprint 2.")
         }
         .sectionSurfaceStyle()
     }
@@ -98,6 +113,10 @@ struct SettingsView: View {
             Text("Exports")
                 .font(FragmentaTypography.sectionTitle)
                 .foregroundStyle(FragmentaColor.textPrimary)
+
+            Text("Prepare library-wide markdown or CSV exports from fragmenta-core, then hand them off through the system share sheet.")
+                .font(FragmentaTypography.body)
+                .foregroundStyle(FragmentaColor.textSecondary)
 
             ForEach(ExportFormat.allCases) { format in
                 ExportRow(
@@ -134,7 +153,7 @@ struct SettingsView: View {
                 .font(FragmentaTypography.sectionTitle)
                 .foregroundStyle(FragmentaColor.textPrimary)
 
-            Text(viewModel.cacheMessage ?? "Library snapshots, book detail payloads, import history, and recent searches are stored locally for a more resilient shell.")
+            Text(viewModel.cacheMessage ?? "Library snapshots, book detail payloads, import history, diagnostics, and recent searches are stored locally to keep the shell resilient.")
                 .font(FragmentaTypography.body)
                 .foregroundStyle(FragmentaColor.textSecondary)
 
@@ -177,9 +196,15 @@ private struct ExportRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: FragmentaSpacing.small) {
             HStack {
-                Text(format.title)
-                    .font(FragmentaTypography.bodyEmphasized)
-                    .foregroundStyle(FragmentaColor.textPrimary)
+                VStack(alignment: .leading, spacing: FragmentaSpacing.tiny) {
+                    Text(format.title)
+                        .font(FragmentaTypography.bodyEmphasized)
+                        .foregroundStyle(FragmentaColor.textPrimary)
+
+                    Text("Library-wide export")
+                        .font(FragmentaTypography.metadata)
+                        .foregroundStyle(FragmentaColor.textTertiary)
+                }
 
                 Spacer()
 

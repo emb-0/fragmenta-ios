@@ -18,17 +18,20 @@ struct SearchView: View {
     var body: some View {
         FragmentaScreenBackground {
             ScrollView {
-                VStack(alignment: .leading, spacing: FragmentaSpacing.xLarge) {
+                VStack(alignment: .leading, spacing: FragmentaSpacing.xxLarge) {
                     FragmentaSectionHeader(
                         eyebrow: "Search",
                         title: "Find a remembered line",
-                        subtitle: "Query the backend by phrase, book, author, or notes, then step directly into the matching highlight."
+                        subtitle: "Query by phrase, book, author, or notes, then step directly into the exact reading context."
                     )
 
-                    SearchComposer(text: Binding(
-                        get: { viewModel.query.text },
-                        set: { viewModel.setQueryText($0) }
-                    ))
+                    SearchComposer(
+                        text: Binding(
+                            get: { viewModel.query.text },
+                            set: { viewModel.setQueryText($0) }
+                        ),
+                        hasFilters: viewModel.query.hasActiveFilters
+                    )
 
                     SearchFilterCard(viewModel: viewModel)
                     searchContent
@@ -66,29 +69,23 @@ struct SearchView: View {
                     }
                 }
             case .failed(let message, _):
-                SearchEmptyState(title: "Search unavailable", message: message)
+                SearchEmptyState(
+                    title: "Search unavailable",
+                    message: message,
+                    actionTitle: nil,
+                    action: nil
+                )
             case .loaded:
                 SearchEmptyState(
                     title: "No matching highlights",
-                    message: "Try a different phrase, widen the filters, or import more reading material."
+                    message: "Try a different phrase, widen the filters, or search by author or notes instead.",
+                    actionTitle: nil,
+                    action: nil
                 )
             }
         } else {
             VStack(alignment: .leading, spacing: FragmentaSpacing.medium) {
-                switch viewModel.state {
-                case .failed(let message, let previous) where previous != nil:
-                    SearchEmptyState(title: "Showing saved results", message: message)
-                case .loading(let previous) where previous != nil:
-                    HStack(spacing: FragmentaSpacing.small) {
-                        ProgressView()
-                            .tint(FragmentaColor.textSecondary)
-                        Text("Refreshing results...")
-                            .font(FragmentaTypography.metadata)
-                            .foregroundStyle(FragmentaColor.textSecondary)
-                    }
-                default:
-                    EmptyView()
-                }
+                SearchResultsSummary(resultCount: results.count, state: viewModel.state)
 
                 LazyVStack(spacing: FragmentaSpacing.large) {
                     ForEach(results) { result in
@@ -121,34 +118,75 @@ struct SearchView: View {
 
 private struct SearchComposer: View {
     @Binding var text: String
+    let hasFilters: Bool
 
     var body: some View {
-        HStack(spacing: FragmentaSpacing.small) {
-            Image(systemName: "magnifyingglass")
-                .foregroundStyle(FragmentaColor.textTertiary)
+        VStack(alignment: .leading, spacing: FragmentaSpacing.small) {
+            HStack(spacing: FragmentaSpacing.small) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundStyle(FragmentaColor.textTertiary)
 
-            TextField("Search passages, authors, or titles", text: $text)
-                .font(FragmentaTypography.body)
-                .foregroundStyle(FragmentaColor.textPrimary)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
+                TextField("Search passages, authors, or titles", text: $text)
+                    .font(FragmentaTypography.body)
+                    .foregroundStyle(FragmentaColor.textPrimary)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+
+                if text.isBlank == false {
+                    Button {
+                        text = ""
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(FragmentaColor.textTertiary)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .fieldSurfaceStyle()
+
+            Text(hasFilters ? "Filters are active, so search can run even without a typed phrase." : "Type a remembered line and let the backend narrow it down.")
+                .font(FragmentaTypography.metadata)
+                .foregroundStyle(FragmentaColor.textSecondary)
         }
-        .fieldSurfaceStyle()
     }
 }
 
 private struct SearchFilterCard: View {
     @ObservedObject var viewModel: SearchViewModel
 
+    private var activeFilterCount: Int {
+        var count = 0
+        if viewModel.query.bookID != nil { count += 1 }
+        if viewModel.query.author.isBlank == false { count += 1 }
+        if viewModel.query.hasNotesOnly { count += 1 }
+        return count
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: FragmentaSpacing.medium) {
             HStack {
-                Text("Filters")
-                    .font(FragmentaTypography.sectionTitle)
-                    .foregroundStyle(FragmentaColor.textPrimary)
+                VStack(alignment: .leading, spacing: FragmentaSpacing.tiny) {
+                    Text("Filters")
+                        .font(FragmentaTypography.sectionTitle)
+                        .foregroundStyle(FragmentaColor.textPrimary)
+
+                    Text("Tighten the reading context without turning the search surface into a form.")
+                        .font(FragmentaTypography.metadata)
+                        .foregroundStyle(FragmentaColor.textSecondary)
+                }
 
                 Spacer()
 
+                if activeFilterCount > 0 {
+                    Text("\(activeFilterCount) ACTIVE")
+                        .font(FragmentaTypography.eyebrow)
+                        .foregroundStyle(FragmentaColor.textPrimary)
+                        .tracking(1.2)
+                        .chipSurfaceStyle()
+                }
+            }
+
+            HStack(spacing: FragmentaSpacing.small) {
                 Menu {
                     ForEach(SearchQuery.Sort.allCases) { sort in
                         Button(sort.title) {
@@ -164,9 +202,7 @@ private struct SearchFilterCard: View {
                     .foregroundStyle(FragmentaColor.textSecondary)
                     .chipSurfaceStyle()
                 }
-            }
 
-            HStack(spacing: FragmentaSpacing.small) {
                 Menu {
                     Button("All books") {
                         viewModel.selectBook(nil)
@@ -220,10 +256,38 @@ private struct SearchFilterCard: View {
     }
 }
 
+private struct SearchResultsSummary: View {
+    let resultCount: Int
+    let state: LoadableState<[HighlightSearchResult]>
+
+    var body: some View {
+        switch state {
+        case .failed(let message, let previous) where previous != nil:
+            SearchEmptyState(title: "Showing saved results", message: message, actionTitle: nil, action: nil)
+        case .loading(let previous) where previous != nil:
+            HStack(spacing: FragmentaSpacing.small) {
+                ProgressView()
+                    .tint(FragmentaColor.textSecondary)
+                Text("Refreshing \(resultCount) results...")
+                    .font(FragmentaTypography.metadata)
+                    .foregroundStyle(FragmentaColor.textSecondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .insetSurfaceStyle()
+        default:
+            Text(resultCount == 1 ? "1 result" : "\(resultCount) results")
+                .font(FragmentaTypography.metadata)
+                .foregroundStyle(FragmentaColor.textSecondary)
+        }
+    }
+}
+
 private struct RecentSearchesSection: View {
     let recentSearches: [String]
     let applyRecentSearch: (String) -> Void
     let clearRecentSearches: () -> Void
+
+    private let columns = [GridItem(.adaptive(minimum: 120), spacing: FragmentaSpacing.small)]
 
     var body: some View {
         VStack(alignment: .leading, spacing: FragmentaSpacing.medium) {
@@ -236,7 +300,17 @@ private struct RecentSearchesSection: View {
                     .font(FragmentaTypography.body)
                     .foregroundStyle(FragmentaColor.textSecondary)
             } else {
-                FlowingRecentSearches(recentSearches: recentSearches, applyRecentSearch: applyRecentSearch)
+                LazyVGrid(columns: columns, alignment: .leading, spacing: FragmentaSpacing.small) {
+                    ForEach(recentSearches, id: \.self) { search in
+                        Button(search) {
+                            applyRecentSearch(search)
+                        }
+                        .font(FragmentaTypography.body)
+                        .foregroundStyle(FragmentaColor.textSecondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .fieldSurfaceStyle()
+                    }
+                }
 
                 Button("Clear recent searches") {
                     clearRecentSearches()
@@ -250,28 +324,11 @@ private struct RecentSearchesSection: View {
     }
 }
 
-private struct FlowingRecentSearches: View {
-    let recentSearches: [String]
-    let applyRecentSearch: (String) -> Void
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: FragmentaSpacing.small) {
-            ForEach(recentSearches, id: \.self) { search in
-                Button(search) {
-                    applyRecentSearch(search)
-                }
-                .font(FragmentaTypography.body)
-                .foregroundStyle(FragmentaColor.textSecondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .fieldSurfaceStyle()
-            }
-        }
-    }
-}
-
 private struct SearchEmptyState: View {
     let title: String
     let message: String
+    let actionTitle: String?
+    let action: (() -> Void)?
 
     var body: some View {
         VStack(alignment: .leading, spacing: FragmentaSpacing.medium) {
@@ -282,6 +339,11 @@ private struct SearchEmptyState: View {
             Text(message)
                 .font(FragmentaTypography.body)
                 .foregroundStyle(FragmentaColor.textSecondary)
+
+            if let actionTitle, let action {
+                Button(actionTitle, action: action)
+                    .fragmentaAdaptiveGlassButton(prominent: true)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .sectionSurfaceStyle()

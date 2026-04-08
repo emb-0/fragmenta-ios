@@ -10,7 +10,7 @@ struct ImportView: View {
     var body: some View {
         FragmentaScreenBackground {
             ScrollView {
-                VStack(alignment: .leading, spacing: FragmentaSpacing.xLarge) {
+                VStack(alignment: .leading, spacing: FragmentaSpacing.xxLarge) {
                     FragmentaSectionHeader(
                         eyebrow: "Import",
                         title: "Bring in a Kindle export",
@@ -24,7 +24,7 @@ struct ImportView: View {
                 }
                 .padding(.horizontal, FragmentaSpacing.large)
                 .padding(.top, FragmentaSpacing.large)
-                .padding(.bottom, 128)
+                .padding(.bottom, 132)
             }
             .scrollIndicators(.hidden)
         }
@@ -54,25 +54,60 @@ struct ImportView: View {
     }
 
     private var sourceModePicker: some View {
-        HStack(spacing: FragmentaSpacing.small) {
-            ForEach(ImportViewModel.SourceMode.allCases) { sourceMode in
-                Button(sourceMode.title) {
-                    viewModel.selectSourceMode(sourceMode)
+        VStack(alignment: .leading, spacing: FragmentaSpacing.medium) {
+            Text("Source")
+                .font(FragmentaTypography.sectionTitle)
+                .foregroundStyle(FragmentaColor.textPrimary)
+
+            HStack(spacing: FragmentaSpacing.small) {
+                ForEach(ImportViewModel.SourceMode.allCases) { sourceMode in
+                    Button {
+                        viewModel.selectSourceMode(sourceMode)
+                    } label: {
+                        VStack(alignment: .leading, spacing: FragmentaSpacing.xSmall) {
+                            Image(systemName: iconName(for: sourceMode))
+                                .font(.system(size: 18, weight: .semibold, design: .rounded))
+                                .foregroundStyle(viewModel.sourceMode == sourceMode ? FragmentaColor.textPrimary : FragmentaColor.textTertiary)
+
+                            Text(sourceMode.title)
+                                .font(FragmentaTypography.bodyEmphasized)
+                                .foregroundStyle(viewModel.sourceMode == sourceMode ? FragmentaColor.textPrimary : FragmentaColor.textSecondary)
+
+                            Text(sourceMode == .paste ? "Paste a raw export directly." : "Read a `.txt` file from Files.")
+                                .font(FragmentaTypography.metadata)
+                                .foregroundStyle(FragmentaColor.textTertiary)
+                                .multilineTextAlignment(.leading)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(FragmentaSpacing.medium)
+                        .background(
+                            RoundedRectangle(cornerRadius: FragmentaRadius.medium, style: .continuous)
+                                .fill(viewModel.sourceMode == sourceMode ? FragmentaColor.surfaceQuaternary.opacity(0.75) : FragmentaColor.surfaceTertiary.opacity(0.58))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: FragmentaRadius.medium, style: .continuous)
+                                        .stroke(viewModel.sourceMode == sourceMode ? FragmentaColor.accent.opacity(0.22) : Color.white.opacity(0.04), lineWidth: 1)
+                                )
+                        )
+                    }
+                    .buttonStyle(.plain)
                 }
-                .font(FragmentaTypography.bodyEmphasized)
-                .foregroundStyle(viewModel.sourceMode == sourceMode ? FragmentaColor.textPrimary : FragmentaColor.textSecondary)
-                .frame(maxWidth: .infinity)
-                .fieldSurfaceStyle()
             }
         }
+        .sectionSurfaceStyle()
     }
 
     private var importSourceCard: some View {
         VStack(alignment: .leading, spacing: FragmentaSpacing.medium) {
             HStack {
-                Text(viewModel.sourceMode == .paste ? "Paste text" : "File input")
-                    .font(FragmentaTypography.sectionTitle)
-                    .foregroundStyle(FragmentaColor.textPrimary)
+                VStack(alignment: .leading, spacing: FragmentaSpacing.xSmall) {
+                    Text(viewModel.sourceMode == .paste ? "Paste the manuscript" : "Selected document")
+                        .font(FragmentaTypography.sectionTitle)
+                        .foregroundStyle(FragmentaColor.textPrimary)
+
+                    Text(viewModel.sourceMode == .paste ? "Paste the full Kindle export, then preview before import." : "Choose a `.txt` file and review the imported text before it reaches the backend.")
+                        .font(FragmentaTypography.metadata)
+                        .foregroundStyle(FragmentaColor.textSecondary)
+                }
 
                 Spacer()
 
@@ -88,14 +123,9 @@ struct ImportView: View {
                 FileSelectionCard(importedFile: importedFile)
             }
 
-            ZStack(alignment: .topLeading) {
-                RoundedRectangle(cornerRadius: FragmentaRadius.large, style: .continuous)
-                    .fill(FragmentaColor.surfaceSecondary)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: FragmentaRadius.large, style: .continuous)
-                            .stroke(Color.white.opacity(0.05), lineWidth: 1)
-                    )
+            ImportDraftStats(rawText: viewModel.rawText, sourceMode: viewModel.sourceMode)
 
+            ZStack(alignment: .topLeading) {
                 if viewModel.rawText.isBlank {
                     Text(viewModel.sourceMode == .paste ? "Paste the full Kindle highlights export here." : "Choose a `.txt` file to load its contents here.")
                         .font(FragmentaTypography.body)
@@ -107,10 +137,12 @@ struct ImportView: View {
                     .scrollContentBackground(.hidden)
                     .font(.system(size: 16, weight: .regular, design: .serif))
                     .foregroundStyle(FragmentaColor.textPrimary)
-                    .frame(minHeight: 280)
+                    .frame(minHeight: 320)
                     .padding(FragmentaSpacing.small)
                     .background(Color.clear)
             }
+            .padding(FragmentaSpacing.small)
+            .editorSurfaceStyle()
         }
         .sectionSurfaceStyle()
     }
@@ -121,13 +153,13 @@ struct ImportView: View {
         case .idle:
             ImportStatusCard(
                 title: "Ready for preview",
-                message: "Sprint 2 previews the backend parse first, then confirms the import with a second request so the app feels less brittle."
+                message: "Fragmenta previews the backend parse first, then confirms the import with a second request so the flow feels trustworthy."
             )
 
         case .editing:
             ImportStatusCard(
                 title: "Draft prepared",
-                message: "Preview the import to see detected books, highlights, notes, duplicates, and warnings before committing."
+                message: "Preview the import to inspect detected books, highlights, notes, duplicates, and warnings before committing."
             )
 
         case .previewLoading:
@@ -159,9 +191,15 @@ struct ImportView: View {
 
         VStack(alignment: .leading, spacing: FragmentaSpacing.medium) {
             HStack {
-                Text("Recent imports")
-                    .font(FragmentaTypography.sectionTitle)
-                    .foregroundStyle(FragmentaColor.textPrimary)
+                VStack(alignment: .leading, spacing: FragmentaSpacing.tiny) {
+                    Text("Recent imports")
+                        .font(FragmentaTypography.sectionTitle)
+                        .foregroundStyle(FragmentaColor.textPrimary)
+
+                    Text("Inspect prior sessions without leaving the app shell.")
+                        .font(FragmentaTypography.metadata)
+                        .foregroundStyle(FragmentaColor.textSecondary)
+                }
 
                 Spacer()
 
@@ -225,13 +263,12 @@ struct ImportView: View {
             .disabled(primaryActionDisabled)
             .fragmentaAdaptiveGlassButton(prominent: true)
         }
+        .padding(.horizontal, FragmentaSpacing.small)
+        .padding(.vertical, FragmentaSpacing.small)
+        .floatingBarStyle()
         .padding(.horizontal, FragmentaSpacing.large)
-        .padding(.vertical, FragmentaSpacing.medium)
-        .background(
-            Rectangle()
-                .fill(FragmentaColor.background.opacity(0.92))
-                .ignoresSafeArea()
-        )
+        .padding(.bottom, FragmentaSpacing.small)
+        .background(Color.clear)
     }
 
     private var primaryActionTitle: String {
@@ -258,6 +295,51 @@ struct ImportView: View {
         default:
             return false
         }
+    }
+
+    private func iconName(for sourceMode: ImportViewModel.SourceMode) -> String {
+        switch sourceMode {
+        case .paste:
+            return "doc.text"
+        case .file:
+            return "folder"
+        }
+    }
+}
+
+private struct ImportDraftStats: View {
+    let rawText: String
+    let sourceMode: ImportViewModel.SourceMode
+
+    private var lineCount: Int {
+        rawText.isBlank ? 0 : rawText.components(separatedBy: .newlines).count
+    }
+
+    private var characterCount: Int {
+        rawText.count
+    }
+
+    var body: some View {
+        HStack(spacing: FragmentaSpacing.medium) {
+            stat(value: sourceMode.title, label: "source")
+            stat(value: "\(lineCount)", label: "lines")
+            stat(value: "\(characterCount)", label: "characters")
+        }
+    }
+
+    private func stat(value: String, label: String) -> some View {
+        VStack(alignment: .leading, spacing: FragmentaSpacing.tiny) {
+            Text(value)
+                .font(FragmentaTypography.bodyEmphasized)
+                .foregroundStyle(FragmentaColor.textPrimary)
+
+            Text(label.uppercased())
+                .font(FragmentaTypography.eyebrow)
+                .foregroundStyle(FragmentaColor.textTertiary)
+                .tracking(1.2)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .insetSurfaceStyle()
     }
 }
 
@@ -292,6 +374,7 @@ private struct ImportStatusCard: View {
             Text(message)
                 .font(FragmentaTypography.body)
                 .foregroundStyle(FragmentaColor.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .sectionSurfaceStyle()
@@ -356,18 +439,7 @@ private struct ImportPreviewCard: View {
             }
 
             if preview.summary.warnings.isEmpty == false {
-                VStack(alignment: .leading, spacing: FragmentaSpacing.small) {
-                    Text("Warnings")
-                        .font(FragmentaTypography.metadata)
-                        .foregroundStyle(FragmentaColor.textSecondary)
-
-                    ForEach(preview.summary.warnings, id: \.self) { warning in
-                        Text(warning)
-                            .font(FragmentaTypography.body)
-                            .foregroundStyle(FragmentaColor.textSecondary)
-                            .insetSurfaceStyle()
-                    }
-                }
+                WarningSection(warnings: preview.summary.warnings)
             }
         }
         .sectionSurfaceStyle()
@@ -388,6 +460,7 @@ private struct ImportResultCard: View {
             Text(response.message ?? response.summaryLine)
                 .font(FragmentaTypography.body)
                 .foregroundStyle(FragmentaColor.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .sectionSurfaceStyle()
     }
@@ -396,8 +469,10 @@ private struct ImportResultCard: View {
 private struct ImportSummaryGrid: View {
     let summary: ImportSummary
 
+    private let columns = [GridItem(.adaptive(minimum: 120), spacing: FragmentaSpacing.medium)]
+
     var body: some View {
-        HStack(spacing: FragmentaSpacing.medium) {
+        LazyVGrid(columns: columns, alignment: .leading, spacing: FragmentaSpacing.medium) {
             metric(value: "\(summary.booksDetected)", label: "books")
             metric(value: "\(summary.highlightsDetected)", label: "highlights")
             metric(value: "\(summary.notesDetected)", label: "notes")
@@ -422,6 +497,32 @@ private struct ImportSummaryGrid: View {
     }
 }
 
+private struct WarningSection: View {
+    let warnings: [String]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: FragmentaSpacing.small) {
+            Text("Warnings")
+                .font(FragmentaTypography.metadata)
+                .foregroundStyle(FragmentaColor.textSecondary)
+
+            ForEach(warnings, id: \.self) { warning in
+                HStack(alignment: .top, spacing: FragmentaSpacing.small) {
+                    Image(systemName: "exclamationmark.triangle")
+                        .foregroundStyle(FragmentaColor.warning)
+                        .padding(.top, 2)
+
+                    Text(warning)
+                        .font(FragmentaTypography.body)
+                        .foregroundStyle(FragmentaColor.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .insetSurfaceStyle()
+            }
+        }
+    }
+}
+
 private struct ImportHistoryRow: View {
     let record: ImportRecord
 
@@ -435,6 +536,13 @@ private struct ImportHistoryRow: View {
                 Text(record.summaryLine)
                     .font(FragmentaTypography.metadata)
                     .foregroundStyle(FragmentaColor.textSecondary)
+
+                if let source = record.source, source.isBlank == false {
+                    Text(source.replacingOccurrences(of: "_", with: " ").capitalized)
+                        .font(FragmentaTypography.chip)
+                        .foregroundStyle(FragmentaColor.textTertiary)
+                        .chipSurfaceStyle()
+                }
             }
 
             Spacer()
@@ -472,18 +580,7 @@ private struct ImportRecordDetailSheet: View {
                     ImportSummaryGrid(summary: record.summary)
 
                     if record.summary.warnings.isEmpty == false {
-                        VStack(alignment: .leading, spacing: FragmentaSpacing.small) {
-                            Text("Warnings")
-                                .font(FragmentaTypography.sectionTitle)
-                                .foregroundStyle(FragmentaColor.textPrimary)
-
-                            ForEach(record.summary.warnings, id: \.self) { warning in
-                                Text(warning)
-                                    .font(FragmentaTypography.body)
-                                    .foregroundStyle(FragmentaColor.textSecondary)
-                                    .insetSurfaceStyle()
-                            }
-                        }
+                        WarningSection(warnings: record.summary.warnings)
                     }
                 }
                 .padding(.horizontal, FragmentaSpacing.large)

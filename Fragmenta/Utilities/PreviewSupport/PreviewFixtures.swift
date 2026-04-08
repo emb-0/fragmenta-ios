@@ -28,6 +28,19 @@ enum PreviewFixtures {
             lastImportedAt: Date().addingTimeInterval(-86_400 * 10),
             createdAt: Date().addingTimeInterval(-86_400 * 180),
             updatedAt: Date().addingTimeInterval(-86_400 * 9)
+        ),
+        Book(
+            id: "bk_ross_gay",
+            title: "The Book of Delights",
+            author: "Ross Gay",
+            source: .manualImport,
+            highlightCount: 29,
+            noteCount: 12,
+            coverURL: nil,
+            synopsis: "Small astonishments, annotated closely enough that the notes begin to feel like another text beside the first.",
+            lastImportedAt: Date().addingTimeInterval(-86_400 * 2),
+            createdAt: Date().addingTimeInterval(-86_400 * 90),
+            updatedAt: Date().addingTimeInterval(-86_400)
         )
     ]
 
@@ -86,12 +99,20 @@ enum PreviewFixtures {
             snippet: "Instructions for living a life: Pay attention. Be astonished. Tell about it.",
             matchedInNote: true,
             matchedField: "note"
+        ),
+        HighlightSearchResult(
+            highlight: highlights[1],
+            book: BookReference(id: books[0].id, title: books[0].title, author: books[0].author),
+            matchedTerms: ["world", "imagination"],
+            snippet: "Whoever you are, no matter how lonely, the world offers itself to your imagination.",
+            matchedInNote: false,
+            matchedField: "text"
         )
     ]
 
     static let searchPage = PaginatedResponse(
         items: searchResults,
-        pageInfo: PageInfo(page: 1, limit: 20, total: 1, hasMore: false, nextPage: nil)
+        pageInfo: PageInfo(page: 1, limit: 20, total: 2, hasMore: false, nextPage: nil)
     )
 
     static let importPreview = ImportPreview(
@@ -146,6 +167,25 @@ enum PreviewFixtures {
             createdAt: Date().addingTimeInterval(-3_600),
             completedAt: Date().addingTimeInterval(-3_500),
             message: "Import completed."
+        ),
+        ImportRecord(
+            id: "imp_second",
+            status: .processing,
+            summary: ImportSummary(
+                booksDetected: 1,
+                highlightsDetected: 11,
+                notesDetected: 3,
+                duplicatesDetected: 0,
+                warningsCount: 0,
+                warnings: []
+            ),
+            booksCreated: 0,
+            booksUpdated: 1,
+            filename: "Notebook Export.txt",
+            source: "kindle_txt",
+            createdAt: Date().addingTimeInterval(-1_200),
+            completedAt: nil,
+            message: "Import is still processing."
         )
     ]
 

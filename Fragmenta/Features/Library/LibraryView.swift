@@ -12,11 +12,11 @@ struct LibraryView: View {
     var body: some View {
         FragmentaScreenBackground {
             ScrollView {
-                VStack(alignment: .leading, spacing: FragmentaSpacing.xxLarge) {
+                VStack(alignment: .leading, spacing: FragmentaSpacing.xxxLarge) {
                     FragmentaSectionHeader(
                         eyebrow: "Fragmenta",
                         title: "Your reading shelf",
-                        subtitle: "A calm, native library for imports that live in fragmenta-core but feel at home on iPhone."
+                        subtitle: "A calmer, publication-minded library for the lines you wanted to keep."
                     )
 
                     LibraryControlsView(viewModel: viewModel)
@@ -59,31 +59,34 @@ struct LibraryView: View {
             case .loaded:
                 EmptyLibraryState(
                     title: "No books match this shelf",
-                    message: "Adjust the sort or filters, or import a new Kindle export to populate the library.",
+                    message: "Adjust the current lens or import a new Kindle export to restore the shelf.",
                     actionTitle: nil,
                     action: nil
                 )
             }
         } else {
-            VStack(alignment: .leading, spacing: FragmentaSpacing.xLarge) {
+            VStack(alignment: .leading, spacing: FragmentaSpacing.xxLarge) {
                 statusBanner
                 LibrarySummaryView(books: displayedBooks)
 
-                if recentBooks.isEmpty == false {
+                ForEach(featuredShelves) { shelf in
                     VStack(alignment: .leading, spacing: FragmentaSpacing.medium) {
-                        sectionLabel("Recently Imported")
+                        LibrarySectionHeading(title: shelf.title, subtitle: shelf.subtitle)
 
-                        ForEach(recentBooks) { book in
-                            navigationCard(for: book, emphasized: true)
+                        ForEach(shelf.books) { book in
+                            navigationCard(for: book, emphasized: shelf.emphasized)
                         }
                     }
                 }
 
                 VStack(alignment: .leading, spacing: FragmentaSpacing.medium) {
-                    sectionLabel(recentBooks.isEmpty ? "Books" : "All Books")
+                    LibrarySectionHeading(
+                        title: featuredShelves.isEmpty ? "Shelf" : "Full shelf",
+                        subtitle: "The complete reading index, sorted by the current lens."
+                    )
 
                     LazyVStack(spacing: FragmentaSpacing.large) {
-                        ForEach(mainShelfBooks) { book in
+                        ForEach(displayedBooks) { book in
                             navigationCard(for: book)
                         }
                     }
@@ -93,26 +96,75 @@ struct LibraryView: View {
     }
 
     private var recentBooks: [Book] {
-        Array((viewModel.state.value ?? []).filter(\.isRecentlyImported).prefix(2))
+        let candidates = (viewModel.state.value ?? []).filter(\.isRecentlyImported)
+        return Array(candidates.prefix(2))
     }
 
-    private var mainShelfBooks: [Book] {
-        let books = viewModel.state.value ?? []
-        guard recentBooks.isEmpty == false else {
-            return books
+    private var annotatedBooks: [Book] {
+        let books = (viewModel.state.value ?? [])
+            .filter { ($0.noteCount ?? 0) > 0 }
+            .sorted { ($0.noteCount ?? 0) > ($1.noteCount ?? 0) }
+        return Array(books.prefix(2))
+    }
+
+    private var mostHighlightedBooks: [Book] {
+        let books = (viewModel.state.value ?? [])
+            .sorted { $0.highlightCount > $1.highlightCount }
+        return Array(books.prefix(2))
+    }
+
+    private var featuredShelves: [LibraryShelfSection] {
+        var sections: [LibraryShelfSection] = []
+
+        if recentBooks.isEmpty == false {
+            sections.append(
+                LibraryShelfSection(
+                    title: "Recently Imported",
+                    subtitle: "Fresh arrivals from the latest parsing pass.",
+                    books: recentBooks,
+                    emphasized: true
+                )
+            )
         }
 
-        let recentIDs = Set(recentBooks.map(\.id))
-        return books.filter { recentIDs.contains($0.id) == false }
+        if annotatedBooks.isEmpty == false {
+            sections.append(
+                LibraryShelfSection(
+                    title: "With Notes",
+                    subtitle: "Books that hold more than highlighted lines.",
+                    books: annotatedBooks,
+                    emphasized: false
+                )
+            )
+        }
+
+        if mostHighlightedBooks.isEmpty == false {
+            sections.append(
+                LibraryShelfSection(
+                    title: "Most Highlighted",
+                    subtitle: "The densest notebooks in the collection.",
+                    books: mostHighlightedBooks,
+                    emphasized: false
+                )
+            )
+        }
+
+        return sections
     }
 
     @ViewBuilder
     private var statusBanner: some View {
         switch viewModel.state {
         case .loaded(_, let source) where source == .cache:
-            LibraryStatusBanner(message: "Showing the last cached library snapshot while the backend catches up.")
+            LibraryStatusBanner(
+                title: "Cached shelf",
+                message: "Showing the last saved library snapshot while fragmenta-core catches up."
+            )
         case .failed(let message, let previous) where previous != nil:
-            LibraryStatusBanner(message: message)
+            LibraryStatusBanner(
+                title: "Saved shelf",
+                message: message
+            )
         case .loading(let previous) where previous != nil:
             HStack(spacing: FragmentaSpacing.small) {
                 ProgressView()
@@ -121,6 +173,8 @@ struct LibraryView: View {
                     .font(FragmentaTypography.metadata)
                     .foregroundStyle(FragmentaColor.textSecondary)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .insetSurfaceStyle()
         default:
             EmptyView()
         }
@@ -145,62 +199,114 @@ struct LibraryView: View {
         }
         .buttonStyle(.plain)
     }
+}
 
-    private func sectionLabel(_ title: String) -> some View {
-        Text(title)
-            .font(FragmentaTypography.sectionTitle)
-            .foregroundStyle(FragmentaColor.textPrimary)
-    }
+private struct LibraryShelfSection: Identifiable {
+    var id: String { title }
+    let title: String
+    let subtitle: String
+    let books: [Book]
+    let emphasized: Bool
 }
 
 private struct LibraryControlsView: View {
     @ObservedObject var viewModel: LibraryViewModel
 
+    private var activeFilterCount: Int {
+        var count = 0
+        if viewModel.query.source != .all { count += 1 }
+        if viewModel.query.hasNotesOnly { count += 1 }
+        if viewModel.query.recentOnly { count += 1 }
+        return count
+    }
+
     var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: FragmentaSpacing.small) {
-                Menu {
-                    ForEach(LibraryQuery.Sort.allCases) { sort in
-                        Button(sort.title) {
-                            viewModel.updateSort(sort)
-                        }
-                    }
-                } label: {
-                    HStack(spacing: FragmentaSpacing.xSmall) {
-                        Text("Sort")
-                        Text(viewModel.query.sort.title)
-                            .foregroundStyle(FragmentaColor.textPrimary)
-                        Image(systemName: "chevron.down")
-                            .font(.caption)
-                    }
-                    .font(FragmentaTypography.metadata)
-                    .foregroundStyle(FragmentaColor.textSecondary)
-                    .chipSurfaceStyle()
+        VStack(alignment: .leading, spacing: FragmentaSpacing.medium) {
+            HStack(alignment: .center) {
+                VStack(alignment: .leading, spacing: FragmentaSpacing.tiny) {
+                    Text("Shelf lens")
+                        .font(FragmentaTypography.sectionTitle)
+                        .foregroundStyle(FragmentaColor.textPrimary)
+
+                    Text("Sort and filter the library without breaking the quiet rhythm of the shelf.")
+                        .font(FragmentaTypography.body)
+                        .foregroundStyle(FragmentaColor.textSecondary)
                 }
 
-                ForEach(LibraryQuery.SourceFilter.allCases) { source in
-                    Button(source.title) {
-                        viewModel.updateSource(source)
-                    }
-                    .font(FragmentaTypography.metadata)
-                    .foregroundStyle(viewModel.query.source == source ? FragmentaColor.textPrimary : FragmentaColor.textSecondary)
-                    .chipSurfaceStyle()
-                }
+                Spacer()
 
-                Button(viewModel.query.hasNotesOnly ? "With Notes" : "Any Notes") {
-                    viewModel.toggleHasNotesOnly()
+                if activeFilterCount > 0 {
+                    Text("\(activeFilterCount) ACTIVE")
+                        .font(FragmentaTypography.eyebrow)
+                        .foregroundStyle(FragmentaColor.textPrimary)
+                        .tracking(1.2)
+                        .chipSurfaceStyle()
                 }
-                .font(FragmentaTypography.metadata)
-                .foregroundStyle(viewModel.query.hasNotesOnly ? FragmentaColor.textPrimary : FragmentaColor.textSecondary)
-                .chipSurfaceStyle()
-
-                Button(viewModel.query.recentOnly ? "Recent Only" : "All Dates") {
-                    viewModel.toggleRecentOnly()
-                }
-                .font(FragmentaTypography.metadata)
-                .foregroundStyle(viewModel.query.recentOnly ? FragmentaColor.textPrimary : FragmentaColor.textSecondary)
-                .chipSurfaceStyle()
             }
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: FragmentaSpacing.small) {
+                    Menu {
+                        ForEach(LibraryQuery.Sort.allCases) { sort in
+                            Button(sort.title) {
+                                viewModel.updateSort(sort)
+                            }
+                        }
+                    } label: {
+                        HStack(spacing: FragmentaSpacing.xSmall) {
+                            Text("Sort")
+                            Text(viewModel.query.sort.title)
+                                .foregroundStyle(FragmentaColor.textPrimary)
+                            Image(systemName: "chevron.down")
+                                .font(.caption)
+                        }
+                        .font(FragmentaTypography.metadata)
+                        .foregroundStyle(FragmentaColor.textSecondary)
+                        .chipSurfaceStyle()
+                    }
+
+                    ForEach(LibraryQuery.SourceFilter.allCases) { source in
+                        Button(source.title) {
+                            viewModel.updateSource(source)
+                        }
+                        .font(FragmentaTypography.metadata)
+                        .foregroundStyle(viewModel.query.source == source ? FragmentaColor.textPrimary : FragmentaColor.textSecondary)
+                        .chipSurfaceStyle()
+                    }
+
+                    Button(viewModel.query.hasNotesOnly ? "With Notes" : "Any Notes") {
+                        viewModel.toggleHasNotesOnly()
+                    }
+                    .font(FragmentaTypography.metadata)
+                    .foregroundStyle(viewModel.query.hasNotesOnly ? FragmentaColor.textPrimary : FragmentaColor.textSecondary)
+                    .chipSurfaceStyle()
+
+                    Button(viewModel.query.recentOnly ? "Recent Only" : "All Dates") {
+                        viewModel.toggleRecentOnly()
+                    }
+                    .font(FragmentaTypography.metadata)
+                    .foregroundStyle(viewModel.query.recentOnly ? FragmentaColor.textPrimary : FragmentaColor.textSecondary)
+                    .chipSurfaceStyle()
+                }
+            }
+        }
+        .sectionSurfaceStyle()
+    }
+}
+
+private struct LibrarySectionHeading: View {
+    let title: String
+    let subtitle: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: FragmentaSpacing.xSmall) {
+            Text(title)
+                .font(FragmentaTypography.sectionTitle)
+                .foregroundStyle(FragmentaColor.textPrimary)
+
+            Text(subtitle)
+                .font(FragmentaTypography.metadata)
+                .foregroundStyle(FragmentaColor.textSecondary)
         }
     }
 }
@@ -220,11 +326,31 @@ private struct LibrarySummaryView: View {
         }
     }
 
+    private var recentBookLine: String {
+        guard
+            let latest = books.sorted(by: {
+                ($0.lastImportedAt ?? .distantPast) > ($1.lastImportedAt ?? .distantPast)
+            }).first
+        else {
+            return "Your library is ready for the next import."
+        }
+
+        return "Most recently refreshed: \(latest.title) by \(latest.displayAuthor)."
+    }
+
     var body: some View {
-        HStack(spacing: FragmentaSpacing.medium) {
-            summaryCard(value: "\(books.count)", label: books.count == 1 ? "book" : "books")
-            summaryCard(value: "\(totalHighlights)", label: totalHighlights == 1 ? "highlight" : "highlights")
-            summaryCard(value: "\(totalNotes)", label: totalNotes == 1 ? "note" : "notes")
+        VStack(alignment: .leading, spacing: FragmentaSpacing.medium) {
+            HStack(spacing: FragmentaSpacing.medium) {
+                summaryCard(value: "\(books.count)", label: books.count == 1 ? "book" : "books")
+                summaryCard(value: "\(totalHighlights)", label: totalHighlights == 1 ? "highlight" : "highlights")
+                summaryCard(value: "\(totalNotes)", label: totalNotes == 1 ? "note" : "notes")
+            }
+
+            Text(recentBookLine)
+                .font(FragmentaTypography.body)
+                .foregroundStyle(FragmentaColor.textSecondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .insetSurfaceStyle()
         }
     }
 
@@ -246,26 +372,40 @@ private struct LibrarySummaryView: View {
 
 private struct LibrarySummarySkeletonView: View {
     var body: some View {
-        HStack(spacing: FragmentaSpacing.medium) {
-            ForEach(0 ..< 3, id: \.self) { _ in
-                RoundedRectangle(cornerRadius: FragmentaRadius.large, style: .continuous)
-                    .fill(FragmentaColor.surfaceOverlay)
-                    .frame(height: 92)
+        VStack(spacing: FragmentaSpacing.medium) {
+            HStack(spacing: FragmentaSpacing.medium) {
+                ForEach(0 ..< 3, id: \.self) { _ in
+                    RoundedRectangle(cornerRadius: FragmentaRadius.large, style: .continuous)
+                        .fill(FragmentaColor.surfaceOverlay)
+                        .frame(height: 92)
+                }
             }
+
+            RoundedRectangle(cornerRadius: FragmentaRadius.medium, style: .continuous)
+                .fill(FragmentaColor.surfaceOverlay)
+                .frame(height: 64)
         }
         .redacted(reason: .placeholder)
     }
 }
 
 private struct LibraryStatusBanner: View {
+    let title: String
     let message: String
 
     var body: some View {
-        Text(message)
-            .font(FragmentaTypography.metadata)
-            .foregroundStyle(FragmentaColor.textSecondary)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .insetSurfaceStyle()
+        VStack(alignment: .leading, spacing: FragmentaSpacing.xSmall) {
+            Text(title.uppercased())
+                .font(FragmentaTypography.eyebrow)
+                .foregroundStyle(FragmentaColor.textTertiary)
+                .tracking(1.2)
+
+            Text(message)
+                .font(FragmentaTypography.body)
+                .foregroundStyle(FragmentaColor.textSecondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .insetSurfaceStyle()
     }
 }
 
@@ -277,6 +417,10 @@ private struct EmptyLibraryState: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: FragmentaSpacing.medium) {
+            Image(systemName: "books.vertical")
+                .font(.system(size: 22, weight: .semibold, design: .rounded))
+                .foregroundStyle(FragmentaColor.textTertiary)
+
             Text(title)
                 .font(FragmentaTypography.sectionTitle)
                 .foregroundStyle(FragmentaColor.textPrimary)

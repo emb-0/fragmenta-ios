@@ -5,45 +5,88 @@ struct SearchResultRowView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: FragmentaSpacing.medium) {
-            VStack(alignment: .leading, spacing: FragmentaSpacing.xSmall) {
-                Text(result.book.title)
-                    .font(FragmentaTypography.cardTitle)
-                    .foregroundStyle(FragmentaColor.textPrimary)
+            HStack(alignment: .top, spacing: FragmentaSpacing.medium) {
+                VStack(alignment: .leading, spacing: FragmentaSpacing.xSmall) {
+                    Text(result.book.title)
+                        .font(FragmentaTypography.cardTitle)
+                        .foregroundStyle(FragmentaColor.textPrimary)
 
-                Text(result.book.displayAuthor)
-                    .font(FragmentaTypography.subheadline)
-                    .foregroundStyle(FragmentaColor.textSecondary)
+                    Text(result.book.displayAuthor)
+                        .font(FragmentaTypography.subheadline)
+                        .foregroundStyle(FragmentaColor.textSecondary)
+                }
+
+                Spacer()
+
+                Image(systemName: "arrow.up.right")
+                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    .foregroundStyle(FragmentaColor.textTertiary)
+                    .padding(FragmentaSpacing.small)
+                    .background(
+                        Circle()
+                            .fill(FragmentaColor.surfaceOverlay)
+                    )
             }
 
-            Text("“\(result.displaySnippet)”")
-                .font(FragmentaTypography.body)
-                .foregroundStyle(FragmentaColor.textPrimary.opacity(0.9))
-                .lineLimit(5)
+            HStack(alignment: .top, spacing: FragmentaSpacing.medium) {
+                Text("“")
+                    .font(.system(size: 40, weight: .regular, design: .serif))
+                    .foregroundStyle(result.matchedInNote == true ? FragmentaColor.accentSoft : FragmentaColor.accent)
+                    .padding(.top, -4)
+
+                Text(result.displaySnippet)
+                    .font(FragmentaTypography.narrative)
+                    .foregroundStyle(FragmentaColor.textPrimary.opacity(0.92))
+                    .lineLimit(5)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(.vertical, FragmentaSpacing.small)
+            .padding(.horizontal, FragmentaSpacing.medium)
+            .background(
+                RoundedRectangle(cornerRadius: FragmentaRadius.medium, style: .continuous)
+                    .fill(FragmentaColor.surfaceTertiary.opacity(0.84))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: FragmentaRadius.medium, style: .continuous)
+                            .stroke(Color.white.opacity(0.05), lineWidth: 1)
+                    )
+            )
 
             HStack(spacing: FragmentaSpacing.small) {
                 if let locationLabel = result.highlight.locationLabel {
-                    Text(locationLabel)
-                        .font(FragmentaTypography.metadata)
-                        .foregroundStyle(FragmentaColor.textSecondary)
+                    metadataChip(locationLabel)
                 }
 
                 if result.matchedInNote == true {
                     Text("Note match")
-                        .font(FragmentaTypography.caption)
+                        .font(FragmentaTypography.chip)
                         .foregroundStyle(FragmentaColor.accentSoft)
                         .chipSurfaceStyle()
                 }
 
                 Spacer()
+            }
 
-                if result.matchedTerms.isEmpty == false {
-                    Text(result.matchedTerms.joined(separator: " · "))
-                        .font(FragmentaTypography.caption)
-                        .foregroundStyle(FragmentaColor.textTertiary)
+            if result.matchedTerms.isEmpty == false {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: FragmentaSpacing.small) {
+                        ForEach(Array(result.matchedTerms.prefix(4)), id: \.self) { term in
+                            Text(term)
+                                .font(FragmentaTypography.chip)
+                                .foregroundStyle(FragmentaColor.textSecondary)
+                                .chipSurfaceStyle()
+                        }
+                    }
                 }
             }
         }
         .sectionSurfaceStyle()
+    }
+
+    private func metadataChip(_ title: String) -> some View {
+        Text(title)
+            .font(FragmentaTypography.chip)
+            .foregroundStyle(FragmentaColor.textSecondary)
+            .chipSurfaceStyle()
     }
 }
 
@@ -60,7 +103,7 @@ struct SearchResultRowSkeletonView: View {
 
             RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .fill(FragmentaColor.surfaceOverlay)
-                .frame(height: 68)
+                .frame(height: 94)
         }
         .redacted(reason: .placeholder)
         .sectionSurfaceStyle()

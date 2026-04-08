@@ -21,7 +21,7 @@ struct BookDetailView: View {
         ScrollViewReader { proxy in
             FragmentaScreenBackground {
                 ScrollView {
-                    VStack(alignment: .leading, spacing: FragmentaSpacing.xLarge) {
+                    VStack(alignment: .leading, spacing: FragmentaSpacing.xxLarge) {
                         detailContent
                     }
                     .padding(.horizontal, FragmentaSpacing.large)
@@ -71,7 +71,7 @@ struct BookDetailView: View {
                 EmptyView()
             }
         } else {
-            VStack(alignment: .leading, spacing: FragmentaSpacing.xLarge) {
+            VStack(alignment: .leading, spacing: FragmentaSpacing.xxLarge) {
                 if let detail {
                     BookDetailHeroView(
                         detail: detail,
@@ -88,26 +88,42 @@ struct BookDetailView: View {
                 }
 
                 VStack(alignment: .leading, spacing: FragmentaSpacing.large) {
-                    Text("Highlights")
-                        .font(FragmentaTypography.sectionTitle)
-                        .foregroundStyle(FragmentaColor.textPrimary)
+                    VStack(alignment: .leading, spacing: FragmentaSpacing.xSmall) {
+                        Text("Captured passages")
+                            .font(FragmentaTypography.sectionTitle)
+                            .foregroundStyle(FragmentaColor.textPrimary)
 
-                    ForEach(highlights) { highlight in
-                        HighlightCardView(
-                            highlight: highlight,
-                            isFocused: highlight.id == viewModel.focusedHighlightID
+                        Text("A scrolling notebook of the lines, notes, and locations carried back from the book.")
+                            .font(FragmentaTypography.metadata)
+                            .foregroundStyle(FragmentaColor.textSecondary)
+                    }
+
+                    if highlights.isEmpty {
+                        DetailStatusCard(
+                            title: "No highlights yet",
+                            message: "This book is present in the library, but fragmenta-core has not returned any saved passages yet."
                         )
-                        .id(highlight.id)
-                        .onAppear {
-                            viewModel.loadMoreIfNeeded(currentHighlight: highlight)
+                    } else {
+                        ForEach(highlights) { highlight in
+                            HighlightCardView(
+                                highlight: highlight,
+                                isFocused: highlight.id == viewModel.focusedHighlightID
+                            )
+                            .id(highlight.id)
+                            .onAppear {
+                                viewModel.loadMoreIfNeeded(currentHighlight: highlight)
+                            }
                         }
                     }
 
                     if viewModel.isLoadingMore {
-                        ProgressView()
-                            .tint(FragmentaColor.textPrimary)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, FragmentaSpacing.medium)
+                        LoadMoreHighlightsFooter()
+                    } else if viewModel.pageInfo.hasMore == false, highlights.isEmpty == false {
+                        Text("End of notebook")
+                            .font(FragmentaTypography.metadata)
+                            .foregroundStyle(FragmentaColor.textTertiary)
+                            .frame(maxWidth: .infinity, alignment: .center)
+                            .padding(.top, FragmentaSpacing.small)
                     }
                 }
             }
@@ -121,39 +137,62 @@ private struct BookDetailHeroView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: FragmentaSpacing.large) {
-            VStack(alignment: .leading, spacing: FragmentaSpacing.small) {
-                if isShowingFocusedContext {
-                    Text("SEARCH CONTEXT")
-                        .font(FragmentaTypography.eyebrow)
-                        .foregroundStyle(FragmentaColor.accentSoft)
-                        .tracking(1.3)
+            HStack(alignment: .top, spacing: FragmentaSpacing.medium) {
+                VStack(alignment: .leading, spacing: FragmentaSpacing.small) {
+                    if isShowingFocusedContext {
+                        Text("SEARCH CONTEXT")
+                            .font(FragmentaTypography.eyebrow)
+                            .foregroundStyle(FragmentaColor.accentSoft)
+                            .tracking(1.3)
+                    }
+
+                    Text(detail.book.title)
+                        .font(FragmentaTypography.heroDisplay)
+                        .foregroundStyle(FragmentaColor.textPrimary)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    Text(detail.book.displayAuthor)
+                        .font(FragmentaTypography.subheadline)
+                        .foregroundStyle(FragmentaColor.textSecondary)
                 }
 
-                Text(detail.book.title)
-                    .font(FragmentaTypography.display)
-                    .foregroundStyle(FragmentaColor.textPrimary)
+                Spacer(minLength: FragmentaSpacing.medium)
 
-                Text(detail.book.displayAuthor)
-                    .font(FragmentaTypography.subheadline)
-                    .foregroundStyle(FragmentaColor.textSecondary)
+                VStack(alignment: .trailing, spacing: FragmentaSpacing.small) {
+                    chip(detail.book.source.rawValue.replacingOccurrences(of: "_", with: " ").capitalized)
+
+                    if let lastImportedAt = detail.stats.lastImportedAt {
+                        chip(lastImportedAt.fragmentaDayMonthYearString())
+                    }
+                }
             }
 
             if let synopsis = detail.book.synopsis, synopsis.isBlank == false {
                 Text(synopsis)
                     .font(FragmentaTypography.body)
                     .foregroundStyle(FragmentaColor.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             HStack(spacing: FragmentaSpacing.medium) {
                 metric(value: "\(detail.stats.highlightCount)", label: "highlights")
                 metric(value: "\(detail.stats.noteCount)", label: "notes")
 
-                if let lastImportedAt = detail.stats.lastImportedAt {
-                    metric(value: lastImportedAt.fragmentaDayMonthYearString(), label: "imported")
+                if let firstHighlightAt = detail.stats.firstHighlightAt {
+                    metric(value: firstHighlightAt.fragmentaDayMonthYearString(), label: "first saved")
+                } else if let latestHighlightAt = detail.stats.latestHighlightAt {
+                    metric(value: latestHighlightAt.fragmentaDayMonthYearString(), label: "last saved")
                 }
             }
         }
-        .journalCardStyle()
+        .modifier(BookDetailHeroSurface(isShowingFocusedContext: isShowingFocusedContext))
+    }
+
+    private func chip(_ text: String) -> some View {
+        Text(text)
+            .font(FragmentaTypography.chip)
+            .foregroundStyle(FragmentaColor.textSecondary)
+            .chipSurfaceStyle()
     }
 
     private func metric(value: String, label: String) -> some View {
@@ -174,6 +213,19 @@ private struct BookDetailHeroView: View {
     }
 }
 
+private struct BookDetailHeroSurface: ViewModifier {
+    let isShowingFocusedContext: Bool
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if isShowingFocusedContext {
+            content.paperGlassCardStyle(tint: FragmentaColor.accentSoft.opacity(0.16))
+        } else {
+            content.journalCardStyle()
+        }
+    }
+}
+
 private struct BookDetailHeroSkeletonView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: FragmentaSpacing.large) {
@@ -183,7 +235,7 @@ private struct BookDetailHeroSkeletonView: View {
 
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .fill(FragmentaColor.surfaceOverlay)
-                .frame(height: 40)
+                .frame(height: 56)
 
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .fill(FragmentaColor.surfaceOverlay)
@@ -211,8 +263,24 @@ private struct DetailStatusCard: View {
             Text(message)
                 .font(FragmentaTypography.body)
                 .foregroundStyle(FragmentaColor.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .sectionSurfaceStyle()
+    }
+}
+
+private struct LoadMoreHighlightsFooter: View {
+    var body: some View {
+        HStack(spacing: FragmentaSpacing.small) {
+            ProgressView()
+                .tint(FragmentaColor.textPrimary)
+
+            Text("Loading the next pages of the notebook...")
+                .font(FragmentaTypography.metadata)
+                .foregroundStyle(FragmentaColor.textSecondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .center)
+        .padding(.vertical, FragmentaSpacing.medium)
     }
 }
 

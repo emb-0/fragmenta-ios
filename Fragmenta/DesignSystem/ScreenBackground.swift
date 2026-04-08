@@ -12,6 +12,17 @@ struct FragmentaScreenBackground<Content: View>: View {
             FragmentaColor.appBackgroundGradient
                 .ignoresSafeArea()
 
+            LinearGradient(
+                colors: [
+                    Color.white.opacity(0.02),
+                    Color.clear,
+                    FragmentaColor.background.opacity(0.55)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
+
             VStack {
                 Circle()
                     .fill(FragmentaColor.ambientGlow)
@@ -34,6 +45,14 @@ struct FragmentaScreenBackground<Content: View>: View {
             }
             .ignoresSafeArea()
 
+            RoundedRectangle(cornerRadius: 220, style: .continuous)
+                .stroke(Color.white.opacity(0.03), lineWidth: 1)
+                .rotationEffect(.degrees(18))
+                .scaleEffect(1.3)
+                .blur(radius: 2)
+                .offset(x: 180, y: -220)
+                .ignoresSafeArea()
+
             content
         }
     }
@@ -46,10 +65,16 @@ struct FragmentaSectionHeader: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: FragmentaSpacing.small) {
-            Text(eyebrow.uppercased())
-                .font(FragmentaTypography.eyebrow)
-                .foregroundStyle(FragmentaColor.textTertiary)
-                .tracking(1.4)
+            HStack(spacing: FragmentaSpacing.small) {
+                Text(eyebrow.uppercased())
+                    .font(FragmentaTypography.eyebrow)
+                    .foregroundStyle(FragmentaColor.textTertiary)
+                    .tracking(1.4)
+
+                Rectangle()
+                    .fill(FragmentaColor.divider)
+                    .frame(width: 40, height: 1)
+            }
 
             Text(title)
                 .font(FragmentaTypography.largeTitle)
@@ -58,6 +83,7 @@ struct FragmentaSectionHeader: View {
             Text(subtitle)
                 .font(FragmentaTypography.body)
                 .foregroundStyle(FragmentaColor.textSecondary)
+                .lineSpacing(2)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)

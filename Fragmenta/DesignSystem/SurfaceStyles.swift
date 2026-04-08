@@ -2,44 +2,78 @@ import SwiftUI
 
 struct JournalCardModifier: ViewModifier {
     func body(content: Content) -> some View {
+        let shape = RoundedRectangle(cornerRadius: FragmentaRadius.hero, style: .continuous)
+
         content
             .padding(FragmentaSpacing.large)
             .background(
-                RoundedRectangle(cornerRadius: FragmentaRadius.hero, style: .continuous)
+                shape
                     .fill(FragmentaColor.surfacePrimary)
                     .overlay(
-                        RoundedRectangle(cornerRadius: FragmentaRadius.hero, style: .continuous)
+                        shape
+                            .fill(
+                                LinearGradient(
+                                    colors: [
+                                        Color.white.opacity(0.05),
+                                        Color.clear,
+                                        FragmentaColor.accent.opacity(0.05)
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                    )
+                    .overlay(
+                        shape
                             .stroke(Color.white.opacity(0.04), lineWidth: 1)
                     )
             )
-            .shadow(color: FragmentaColor.shadow.opacity(0.8), radius: 14, x: 0, y: 8)
+            .shadow(color: FragmentaColor.shadow.opacity(0.82), radius: 20, x: 0, y: 10)
     }
 }
 
 struct SectionSurfaceModifier: ViewModifier {
     func body(content: Content) -> some View {
+        let shape = RoundedRectangle(cornerRadius: FragmentaRadius.large, style: .continuous)
+
         content
             .padding(FragmentaSpacing.large)
             .background(
-                RoundedRectangle(cornerRadius: FragmentaRadius.large, style: .continuous)
+                shape
                     .fill(FragmentaColor.surfaceSecondary)
                     .overlay(
-                        RoundedRectangle(cornerRadius: FragmentaRadius.large, style: .continuous)
+                        shape
+                            .fill(
+                                LinearGradient(
+                                    colors: [
+                                        Color.white.opacity(0.035),
+                                        Color.clear
+                                    ],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
+                    )
+                    .overlay(
+                        shape
                             .stroke(Color.white.opacity(0.04), lineWidth: 1)
                     )
             )
+            .shadow(color: FragmentaColor.shadow.opacity(0.42), radius: 14, x: 0, y: 8)
     }
 }
 
 struct InsetSurfaceModifier: ViewModifier {
     func body(content: Content) -> some View {
+        let shape = RoundedRectangle(cornerRadius: FragmentaRadius.medium, style: .continuous)
+
         content
             .padding(FragmentaSpacing.medium)
             .background(
-                RoundedRectangle(cornerRadius: FragmentaRadius.medium, style: .continuous)
+                shape
                     .fill(FragmentaColor.surfaceTertiary)
                     .overlay(
-                        RoundedRectangle(cornerRadius: FragmentaRadius.medium, style: .continuous)
+                        shape
                             .stroke(Color.white.opacity(0.05), lineWidth: 1)
                     )
             )
@@ -64,17 +98,73 @@ struct ChipSurfaceModifier: ViewModifier {
 
 struct FieldSurfaceModifier: ViewModifier {
     func body(content: Content) -> some View {
+        let shape = RoundedRectangle(cornerRadius: FragmentaRadius.medium, style: .continuous)
+
         content
             .padding(.horizontal, FragmentaSpacing.medium)
             .padding(.vertical, FragmentaSpacing.medium)
             .background(
-                RoundedRectangle(cornerRadius: FragmentaRadius.medium, style: .continuous)
-                    .fill(FragmentaColor.surfaceSecondary)
+                shape
+                    .fill(FragmentaColor.surfaceSecondary.opacity(0.9))
                     .overlay(
-                        RoundedRectangle(cornerRadius: FragmentaRadius.medium, style: .continuous)
+                        shape
+                            .fill(
+                                LinearGradient(
+                                    colors: [
+                                        Color.white.opacity(0.04),
+                                        Color.clear
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                    )
+                    .overlay(
+                        shape
                             .stroke(Color.white.opacity(0.05), lineWidth: 1)
                     )
             )
+            .shadow(color: FragmentaColor.shadow.opacity(0.2), radius: 10, x: 0, y: 4)
+    }
+}
+
+struct EditorSurfaceModifier: ViewModifier {
+    func body(content: Content) -> some View {
+        let shape = RoundedRectangle(cornerRadius: FragmentaRadius.large, style: .continuous)
+
+        content
+            .background(
+                shape
+                    .fill(FragmentaColor.surfaceMuted.opacity(0.94))
+                    .overlay(
+                        shape
+                            .stroke(Color.white.opacity(0.06), lineWidth: 1)
+                    )
+            )
+            .shadow(color: FragmentaColor.shadow.opacity(0.3), radius: 16, x: 0, y: 8)
+    }
+}
+
+struct FloatingBarModifier: ViewModifier {
+    func body(content: Content) -> some View {
+        let shape = RoundedRectangle(cornerRadius: FragmentaRadius.hero, style: .continuous)
+
+        content
+            .padding(FragmentaSpacing.small)
+            .background(
+                shape
+                    .fill(Color.clear)
+                    .fragmentaCustomGlass(
+                        in: shape,
+                        tint: FragmentaColor.accent.opacity(0.08),
+                        fallbackFill: FragmentaColor.backgroundElevated.opacity(0.96)
+                    )
+                    .overlay(
+                        shape
+                            .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                    )
+            )
+            .shadow(color: FragmentaColor.shadow.opacity(0.55), radius: 22, x: 0, y: 10)
     }
 }
 
@@ -123,6 +213,14 @@ extension View {
 
     func fieldSurfaceStyle() -> some View {
         modifier(FieldSurfaceModifier())
+    }
+
+    func editorSurfaceStyle() -> some View {
+        modifier(EditorSurfaceModifier())
+    }
+
+    func floatingBarStyle() -> some View {
+        modifier(FloatingBarModifier())
     }
 
     func paperGlassCardStyle(tint: Color? = FragmentaColor.accent.opacity(0.14)) -> some View {

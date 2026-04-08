@@ -47,8 +47,10 @@ struct RootView: View {
             .tag(RootTab.settings)
         }
         .tint(FragmentaColor.textPrimary)
+        .animation(.spring(response: 0.32, dampingFraction: 0.88), value: appState.selectedTab)
         .toolbarColorScheme(.dark, for: .tabBar)
-        .toolbarBackground(FragmentaColor.background.opacity(0.94), for: .tabBar)
+        .toolbarBackground(.visible, for: .tabBar)
+        .toolbarBackground(FragmentaColor.backgroundElevated.opacity(0.94), for: .tabBar)
         .fragmentaTabBarMinimization()
     }
 }

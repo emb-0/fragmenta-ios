@@ -1,74 +1,85 @@
 # Fragmenta iOS
 
-Fragmenta iOS is the standalone native SwiftUI client for `fragmenta-core`, the separate Next.js backend that stores books and Kindle highlights. This repository is intentionally a real native iOS codebase, not a web wrapper, not React Native, and not Expo.
+Fragmenta iOS is the standalone native SwiftUI client for `fragmenta-core`, the separate Next.js backend that stores Kindle-imported books, highlights, notes, imports, and exports.
 
-Sprint 1 establishes the app shell, production-minded architecture, typed backend contracts, premium design system, and core reading surfaces so the project is immediately useful once opened in Xcode.
+This repository is intentionally:
 
-## Sprint 1 goals
+- a real native iOS codebase in Swift and SwiftUI
+- not a web wrapper
+- not React Native
+- not Expo
+- not cross-platform scaffolding
 
-- Mirror the premium journal aesthetic from `../ephemeride-ios/Ephemeride/Core/DesignSystem/`
-- Build a real SwiftUI app entry and navigation shell
-- Add typed models and a configurable backend client for `fragmenta-core`
-- Scaffold polished Library, Book Detail, Search, Import, and Settings screens
-- Keep mocks isolated to previews only
-- Leave a clean path for future auth, offline support, richer import flows, and search refinement
+Sprint 2 takes the Sprint 1 shell and turns it into a connected, caching-aware, production-minded app shell that is close to runnable the moment it is opened in Xcode.
 
-## Design system inheritance
+## Sprint 2 snapshot
 
-Fragmenta reuses the sibling app's visual language by porting the same:
+Sprint 2 adds:
 
-- Liquid glass support patterns from `LiquidGlassSupport.swift`
-- typography scale and rounded editorial hierarchy
-- dark premium palette and restrained surface layering
-- spacing and radius proportions that make the interface feel like the same product family
+- stronger app state and dependency wiring
+- richer backend contracts and resilient decoding
+- paginated library, book detail, and search flows
+- debounced search with filter support
+- real import preview and commit flows
+- UIDocumentPicker-based `.txt` import plumbing
+- import history fetching and detail inspection
+- lightweight local persistence for cached responses and search memory
+- export service hooks for markdown and CSV
+- a more useful Settings screen with backend, cache, export, and diagnostics surfaces
 
-Files live in [`Fragmenta/DesignSystem`](./Fragmenta/DesignSystem).
+The visual language still inherits the premium journal aesthetic from `../ephemeride-ios/Ephemeride/Core/DesignSystem/`, including the liquid-glass support, typography hierarchy, restrained palette, and calm material treatment.
 
-## What was scaffolded
+## Architecture
 
 ### App shell
 
-- `FragmentaApp.swift` with SwiftUI app entry
-- `RootView.swift` with native tab navigation
-- `AppState.swift` for lightweight shared tab state
-- `AppContainer.swift` for dependency wiring
+- `Fragmenta/App/FragmentaApp.swift`
+- `Fragmenta/App/RootView.swift`
+- `Fragmenta/Core/AppState.swift`
+- `Fragmenta/Core/AppContainer.swift`
 
-### Models
+`AppState` owns lightweight tab state plus the live dependency container. `AppContainer` wires config, services, cache, preferences, and diagnostics together without bringing business logic into views.
 
-- `AppConfig`
-- `Book`
-- `BookDetail`
-- `Highlight`
-- `HighlightSearchResult`
-- `ImportRequest`
-- `ImportResponse`
-- `APIError`
+### Core infrastructure
 
-### Networking and services
+- `Fragmenta/Core/AppPreferencesStore.swift`
+- `Fragmenta/Core/DiagnosticsStore.swift`
+- `Fragmenta/Core/FragmentaCacheStore.swift`
 
-- generic `APIClient`
-- typed `APIEndpoint` builders
-- future-friendly request header provider seam for auth later
-- `BooksService`
-- `SearchService`
-- `HighlightService`
+Persistence is intentionally lightweight:
 
-### Feature screens
+- JSON file cache in `Caches/FragmentaCache` for library data, book detail payloads, paged highlights, and import summaries
+- `UserDefaults` for development base URL override, recent searches, and diagnostics snapshot
 
-- `LibraryView`
-- `BookDetailView`
-- `SearchView`
-- `ImportView`
-- `SettingsView`
-- premium `HighlightCardView`
-- feature-specific view models for async loading and UI state
+This is not an offline-sync engine. It is a pragmatic cache layer so the app feels less fragile when `fragmenta-core` is slow or temporarily unavailable.
 
-### Preview-only support
+### Services
 
-- `PreviewFixtures.swift`
-- `PreviewContainer.swift`
+- `Fragmenta/Services/BooksService.swift`
+- `Fragmenta/Services/SearchService.swift`
+- `Fragmenta/Services/ImportService.swift`
+- `Fragmenta/Services/ExportService.swift`
+- `Fragmenta/Services/API/APIClient.swift`
+- `Fragmenta/Services/API/APIEndpoint.swift`
 
-No fake demo logic was added to production services.
+The service layer is structured for:
+
+- async/await networking
+- future auth/header injection without rewriting the client
+- pagination
+- request cancellation in view models
+- backend error mapping into typed `APIError`
+- cached fallback loading
+
+### Feature areas
+
+- `Fragmenta/Features/Library`
+- `Fragmenta/Features/Highlights`
+- `Fragmenta/Features/Search`
+- `Fragmenta/Features/Import`
+- `Fragmenta/Features/Settings`
+
+Each feature owns its view model and screen state instead of pushing network orchestration into views.
 
 ## Important file tree
 
@@ -82,17 +93,32 @@ fragmenta-ios/
 ├── Fragmenta/
 │   ├── App/
 │   ├── Core/
+│   │   ├── AppContainer.swift
+│   │   ├── AppPreferencesStore.swift
+│   │   ├── AppState.swift
+│   │   ├── DiagnosticsStore.swift
+│   │   └── FragmentaCacheStore.swift
 │   ├── DesignSystem/
 │   ├── Features/
 │   │   ├── Highlights/
 │   │   ├── Import/
+│   │   │   └── KindleDocumentPicker.swift
 │   │   ├── Library/
 │   │   ├── Search/
 │   │   └── Settings/
 │   ├── Models/
-│   ├── Resources/
+│   │   ├── ExportArtifact.swift
+│   │   ├── ImportPreview.swift
+│   │   ├── ImportRecord.swift
+│   │   ├── LibraryQuery.swift
+│   │   ├── Pagination.swift
+│   │   └── SearchQuery.swift
 │   ├── Services/
-│   │   └── API/
+│   │   ├── API/
+│   │   ├── BooksService.swift
+│   │   ├── ExportService.swift
+│   │   ├── ImportService.swift
+│   │   └── SearchService.swift
 │   └── Utilities/
 │       └── PreviewSupport/
 ├── Fragmenta.xcodeproj
@@ -100,11 +126,27 @@ fragmenta-ios/
 └── README.md
 ```
 
-## Expected backend contract with fragmenta-core
+## Backend contract assumptions
 
-Sprint 1 assumes `fragmenta-core` exposes a public JSON API with a `data` envelope on successful responses and an `error` envelope on failures.
+Sprint 2 assumes the backend is public and unauthenticated.
+
+Expected endpoints:
+
+- `GET /api/books`
+- `GET /api/books/{id}`
+- `GET /api/books/{id}/highlights?page=&limit=`
+- `GET /api/highlights/{id}`
+- `GET /api/search?q=&book_id=&author=&has_notes=&sort=&page=&limit=`
+- `POST /api/imports/kindle`
+- `POST /api/imports/kindle/preview`
+- `GET /api/imports`
+- `GET /api/imports/{id}`
+- `GET /api/exports/markdown`
+- `GET /api/exports/csv`
 
 ### Success envelope
+
+The client prefers a `data` envelope:
 
 ```json
 {
@@ -112,39 +154,89 @@ Sprint 1 assumes `fragmenta-core` exposes a public JSON API with a `data` envelo
 }
 ```
 
+For paginated responses, the code is intentionally tolerant. It can decode:
+
+- `data` as a plain array
+- `data.items`
+- `data.results`
+- `data.highlights`
+- `data.books`
+- `data.imports`
+- `data.records`
+
+Pagination metadata is expected in one of these shapes:
+
+- `pagination`
+- `page_info`
+- `pageInfo`
+- `meta`
+
+If pagination metadata is missing, the client falls back to a single-page response.
+
 ### Error envelope
+
+The client expects one of these error shapes:
 
 ```json
 {
   "error": {
-    "code": "string_code",
+    "code": "backend_code",
     "message": "Human readable message",
     "details": "Optional detail",
-    "request_id": "Optional trace id"
+    "request_id": "Optional request trace",
+    "status_code": 500
   }
 }
 ```
 
-### Endpoint assumptions
+or
+
+```json
+{
+  "error": "Human readable message"
+}
+```
+
+### Model assumptions
+
+The app currently assumes:
+
+- JSON uses `snake_case`
+- dates are ISO8601 strings
+- book sources may include `kindle_export`, `manual_import`, or unknown variants
+- import status values may vary slightly, so the client tolerates synonyms like `queued`, `pending`, `success`, and `error`
+- search may be performed either with a text query or with filters alone if the backend supports it
+
+### Example response shapes
 
 #### `GET /api/books`
 
 ```json
 {
-  "data": [
-    {
-      "id": "bk_123",
-      "title": "Book title",
-      "author": "Author name",
-      "source": "kindle_export",
-      "highlight_count": 42,
-      "cover_url": null,
-      "synopsis": "Optional summary",
-      "last_imported_at": "2026-04-08T12:00:00Z",
-      "created_at": "2026-04-01T12:00:00Z",
-      "updated_at": "2026-04-08T12:00:00Z"
+  "data": {
+    "items": [
+      {
+        "id": "bk_123",
+        "title": "The Book",
+        "author": "Author Name",
+        "source": "kindle_export",
+        "highlight_count": 42,
+        "note_count": 7,
+        "cover_url": null,
+        "synopsis": null,
+        "last_imported_at": "2026-04-08T12:00:00Z",
+        "created_at": "2026-04-01T12:00:00Z",
+        "updated_at": "2026-04-08T12:00:00Z"
+      }
+    ],
+    "pagination": {
+      "page": 1,
+      "limit": 100,
+      "total": 1,
+      "has_more": false,
+      "next_page": null
     }
-  ]
+  }
 }
 ```
 
@@ -155,20 +247,23 @@ Sprint 1 assumes `fragmenta-core` exposes a public JSON API with a `data` envelo
   "data": {
     "book": {
       "id": "bk_123",
-      "title": "Book title",
-      "author": "Author name",
+      "title": "The Book",
+      "author": "Author Name",
       "source": "kindle_export",
       "highlight_count": 42,
+      "note_count": 7,
       "cover_url": null,
-      "synopsis": "Optional summary",
+      "synopsis": null,
       "last_imported_at": "2026-04-08T12:00:00Z",
       "created_at": "2026-04-01T12:00:00Z",
       "updated_at": "2026-04-08T12:00:00Z"
     },
     "stats": {
       "highlight_count": 42,
-      "note_count": 3,
-      "last_imported_at": "2026-04-08T12:00:00Z"
+      "note_count": 7,
+      "last_imported_at": "2026-04-08T12:00:00Z",
+      "first_highlight_at": "2026-03-20T12:00:00Z",
+      "latest_highlight_at": "2026-04-08T12:00:00Z"
     }
   }
 }
@@ -178,55 +273,70 @@ Sprint 1 assumes `fragmenta-core` exposes a public JSON API with a `data` envelo
 
 ```json
 {
-  "data": [
-    {
-      "id": "hl_123",
-      "book_id": "bk_123",
-      "text": "Highlighted passage",
-      "note": "Optional note",
-      "location": 512,
-      "page": null,
-      "chapter": "Optional chapter",
-      "color_name": null,
-      "highlighted_at": "2026-04-08T12:00:00Z",
-      "created_at": "2026-04-08T12:00:00Z",
-      "book": null
-    }
-  ]
-}
-```
-
-#### `GET /api/search?q=`
-
-```json
-{
-  "data": [
-    {
-      "highlight": {
+  "data": {
+    "highlights": [
+      {
         "id": "hl_123",
         "book_id": "bk_123",
         "text": "Highlighted passage",
-        "note": null,
+        "note": "Optional note",
         "location": 512,
         "page": null,
         "chapter": "Optional chapter",
         "color_name": null,
         "highlighted_at": "2026-04-08T12:00:00Z",
         "created_at": "2026-04-08T12:00:00Z",
+        "updated_at": "2026-04-08T12:00:00Z",
         "book": null
-      },
-      "book": {
-        "id": "bk_123",
-        "title": "Book title",
-        "author": "Author name"
-      },
-      "matched_terms": ["passage"]
+      }
+    ],
+    "pagination": {
+      "page": 1,
+      "limit": 24,
+      "total": 1,
+      "has_more": false,
+      "next_page": null
     }
-  ]
+  }
 }
 ```
 
-#### `POST /api/imports/kindle`
+#### `GET /api/search`
+
+```json
+{
+  "data": {
+    "results": [
+      {
+        "highlight": {
+          "id": "hl_123",
+          "book_id": "bk_123",
+          "text": "Highlighted passage",
+          "note": "Optional note"
+        },
+        "book": {
+          "id": "bk_123",
+          "title": "The Book",
+          "author": "Author Name"
+        },
+        "matched_terms": ["passage"],
+        "snippet": "…Highlighted passage…",
+        "matched_in_note": false,
+        "matched_field": "text"
+      }
+    ],
+    "pagination": {
+      "page": 1,
+      "limit": 20,
+      "total": 1,
+      "has_more": false,
+      "next_page": null
+    }
+  }
+}
+```
+
+#### `POST /api/imports/kindle/preview`
 
 Request body:
 
@@ -234,114 +344,212 @@ Request body:
 {
   "source": "kindle_txt",
   "raw_text": "Full Kindle export text",
-  "filename": "kindle-highlights.txt",
-  "dry_run": false
+  "filename": "My Clippings.txt",
+  "dry_run": true
 }
 ```
 
-Response:
+Example response:
+
+```json
+{
+  "data": {
+    "summary": {
+      "books_detected": 2,
+      "highlights_detected": 18,
+      "notes_detected": 4,
+      "duplicates_detected": 1,
+      "warnings_count": 1,
+      "warnings": ["One malformed section was skipped."]
+    },
+    "detected_books": [
+      {
+        "id": "tmp_1",
+        "title": "The Book",
+        "author": "Author Name",
+        "highlights_detected": 12,
+        "notes_detected": 3
+      }
+    ],
+    "message": "Preview generated."
+  }
+}
+```
+
+#### `POST /api/imports/kindle`
+
+Example response:
 
 ```json
 {
   "data": {
     "import_id": "imp_123",
     "status": "completed",
+    "summary": {
+      "books_detected": 2,
+      "highlights_detected": 18,
+      "notes_detected": 4,
+      "duplicates_detected": 1,
+      "warnings_count": 1,
+      "warnings": ["One malformed section was skipped."]
+    },
     "books_created": 1,
-    "books_updated": 0,
-    "highlights_imported": 32,
-    "duplicate_highlights": 0,
-    "warnings": [],
-    "message": "Import completed"
+    "books_updated": 1,
+    "created_at": "2026-04-08T12:00:00Z",
+    "completed_at": "2026-04-08T12:00:04Z",
+    "filename": "My Clippings.txt",
+    "message": "Import completed."
   }
 }
 ```
 
-### Serialization assumptions
+## Sprint 2 feature coverage
 
-- keys are `snake_case`
-- dates are ISO8601 strings
-- endpoints are public in Sprint 1
-- auth can be added later through the request headers provider without reworking the API client
+### Library
 
-## Networking configuration
+- improved editorial hierarchy
+- sort and filter controls
+- pull to refresh
+- summary metrics
+- recent-import emphasis
+- loading skeletons
+- cached fallback behavior
+- recovery states when backend requests fail
 
-`AppConfig` reads the backend origin from `FragmentaAPIBaseURL` in `Info.plist`, which is populated from xcconfig files:
+### Book detail
 
-- `Config/Debug.xcconfig`
-- `Config/Release.xcconfig`
+- stronger metadata header
+- paginated highlight loading
+- deep-linkable highlight focus path
+- refined highlight cards with copy/share stubs
+- calmer scroll and loading treatment
 
-Important: the base URL should be the backend origin, not a full endpoint path. The client appends `/api/...` itself.
+### Search
 
-Default values:
+- debounced query execution
+- filter support for book, author, notes, and sort
+- pagination
+- recent search memory
+- tap-through to exact book and highlight context
 
-- Debug: `http://127.0.0.1:3000`
-- Release: `https://fragmenta-core.example.com`
+### Import
 
-If your backend runs on a different host or port, update those files before running the app.
+- paste-text flow
+- document-picker `.txt` flow
+- preview before commit
+- import confirmation step
+- import summary surfaces
+- backend history fetch and inspection
+- cached last-success summary restore
 
-## What still requires Xcode
+### Settings
 
-This repo includes generated Swift source and an `Fragmenta.xcodeproj`, but you will still need Xcode for:
+- backend URL display
+- debug-only base URL override
+- version and build display
+- export actions
+- diagnostics summary
+- cache clear action
 
-- actual compile validation
-- code signing and team selection
-- simulator or device runs
-- adding a real app icon set
-- adjusting deployment target or bundle settings if your local setup differs
+## Local persistence
 
-I did not attempt simulator tests or an Xcode build in this environment.
+Current persistence choices are deliberately small and readable:
 
-## How to open and run later in Xcode
+- file cache for books, book detail, paged highlights, import history, and last import summary
+- `UserDefaults` for recent searches
+- `UserDefaults` for diagnostics snapshot
+- `UserDefaults` for development base URL override
 
-1. Install Xcode on your MacBook.
-2. Open this repo: `~/claude/Code/fragmenta-ios`
-3. Optional but recommended: regenerate the project with `xcodegen generate`
-4. Open `Fragmenta.xcodeproj`
-5. In the target settings, set your `Development Team`
-6. Confirm or change `PRODUCT_BUNDLE_IDENTIFIER` in `Config/Base.xcconfig`
-7. Set the correct backend origin in `Config/Debug.xcconfig` and `Config/Release.xcconfig`
-8. If you are hitting a non-HTTPS local backend, keep using the debug config and verify ATS behavior matches your setup
-9. Select an iPhone simulator or device
-10. Build and run
+This keeps the app resilient without introducing database migrations or offline merge logic in Sprint 2.
 
-## Config values you need to set
+## Config values
 
-- `FRAGMENTA_API_BASE_URL` in `Config/Debug.xcconfig`
-- `FRAGMENTA_API_BASE_URL` in `Config/Release.xcconfig`
-- `PRODUCT_BUNDLE_IDENTIFIER` in `Config/Base.xcconfig` if you want a custom identifier
-- `DEVELOPMENT_TEAM` in Xcode target settings or xcconfig if you prefer checking it in locally
+Required values live in the xcconfig files:
 
-## Assumptions made
+- `FRAGMENTA_API_BASE_URL`
+- `PRODUCT_BUNDLE_IDENTIFIER`
+- `DEVELOPMENT_TEAM`
 
-- `fragmenta-core` is the source of truth for parsing, persistence, and search
-- the iOS app should never parse Kindle exports as business logic beyond packaging raw text for upload
-- public unauthenticated access is acceptable in Sprint 1
-- book detail metadata and highlight lists may come from separate endpoints
-- the backend returns either a `data` envelope or an `error` envelope
-- the backend can return `book` references inside search results
+Current defaults:
 
-## Sprint 2 recommendations
+- `Config/Debug.xcconfig` points to `http://127.0.0.1:3000`
+- `Config/Release.xcconfig` points to `https://fragmenta-core.example.com`
 
-- add file importer and share-sheet ingestion for Kindle `.txt` files
-- support deep-linking from search results to specific highlights inside a book
-- add response caching and offline-read support
-- add import history and retry UX
-- introduce authentication once `fragmenta-core` requires it
-- refine search with filters for book, author, and date
-- add pagination or incremental loading for large libraries
-- add a real icon, launch screen polish, and haptic finishing touches
+App versioning now defaults to:
 
-## Regenerating the project
+- `MARKETING_VERSION = 0.2.0`
+- `CURRENT_PROJECT_VERSION = 2`
 
-This repo includes both the checked-in project and the manifest that generated it:
+## How networking works
 
-- `Fragmenta.xcodeproj`
-- `project.yml`
+- `AppConfig` reads `FragmentaAPIBaseURL` from `Info.plist`
+- `Info.plist` resolves that value from `FRAGMENTA_API_BASE_URL`
+- `APIClient` builds typed requests from `APIEndpoint`
+- `PublicRequestHeadersProvider` is the current header seam
+- auth is intentionally absent in Sprint 2, but the header provider keeps the path open for Sprint 3+
 
-If target settings drift, run:
+In `DEBUG`, Settings includes a base URL override field. That override is stored locally and used to rebuild the live dependency container without editing source files.
 
-```bash
-xcodegen generate
-```
+## Xcode setup
 
-That will rebuild the project from the manifest without touching your Swift source.
+### Already done in the repo
+
+- native SwiftUI source files are in place
+- `Fragmenta.xcodeproj` exists
+- `project.yml` exists and can regenerate the project
+- `Info.plist` and xcconfig files are wired
+
+### What you still need to do in Xcode
+
+1. Open the repo folder.
+2. Run `xcodegen generate` if you want to refresh the project from `project.yml`.
+3. Open `Fragmenta.xcodeproj`.
+4. Select the `Fragmenta` target.
+5. Set your signing team.
+6. Confirm or change `PRODUCT_BUNDLE_IDENTIFIER`.
+7. Set `FRAGMENTA_API_BASE_URL` to the correct backend URL for the environment you want.
+8. Build and run.
+
+### Notes for local backend development
+
+- If you run `fragmenta-core` locally on the same Mac, the current Debug value is `http://127.0.0.1:3000`.
+- If you run on a physical device later, `127.0.0.1` will not point to your Mac. Use your LAN IP, a tunnel, or another reachable development URL instead.
+
+## Validation completed here
+
+Completed in this environment:
+
+- source scaffolding and Sprint 2 wiring
+- Xcode project regeneration with `xcodegen generate`
+- `plutil -lint Config/Info.plist`
+
+Not completed here:
+
+- opening the project in Xcode
+- building against the iOS SDK
+- simulator or device execution
+- validating share sheet behavior
+- validating document picker behavior on-device
+- validating clipboard and haptic behavior on-device
+- validating pull-to-refresh spinners and navigation polish live
+
+This machine does not have Xcode installed, so final compile/runtime validation still needs to happen on a Mac with Xcode.
+
+## What likely needs light cleanup after opening in Xcode
+
+- any backend field names that differ from the current assumptions
+- any endpoint-specific pagination keys that differ from the tolerant defaults
+- signing and bundle settings
+- simulator or device-specific polish issues
+- export/share edge cases depending on actual backend file headers
+
+## Sprint 3 recommendations
+
+- file importer from share sheet and Files app entry points
+- richer export and share destinations
+- stronger highlight actions and native copy/share affordances
+- more precise search-result snippet highlighting
+- optimistic refresh and better background refresh patterns
+- optional auth once `fragmenta-core` requires it
+- cover art handling and image caching if the backend exposes it
+- test targets and first-pass UI/state regression coverage once Xcode validation is available

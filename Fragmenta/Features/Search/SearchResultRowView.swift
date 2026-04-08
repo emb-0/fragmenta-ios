@@ -131,7 +131,7 @@ struct SearchResultRowView: View {
         for term in terms {
             var searchRange = attributed.startIndex ..< attributed.endIndex
 
-            while let range = attributed.range(of: term, options: [.caseInsensitive], range: searchRange, locale: .current) {
+            while let range = attributed[searchRange].range(of: term, options: [.caseInsensitive], locale: .current) {
                 attributed[range].foregroundColor = result.matchedInNote == true ? FragmentaColor.accentSoft : FragmentaColor.accent
                 searchRange = range.upperBound ..< attributed.endIndex
             }

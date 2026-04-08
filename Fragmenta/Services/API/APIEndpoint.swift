@@ -52,8 +52,8 @@ extension APIEndpoint where Response == PaginatedResponse<Highlight> {
         APIEndpoint(
             path: "/api/books/\(bookID)/highlights",
             queryItems: [
-                URLQueryItem(name: "page", value: "\(page.page)"),
-                URLQueryItem(name: "limit", value: "\(page.limit)")
+                URLQueryItem(name: "limit", value: "\(page.limit)"),
+                URLQueryItem(name: "offset", value: "\(max(page.page - 1, 0) * page.limit)")
             ]
         )
     }
@@ -76,8 +76,8 @@ extension APIEndpoint where Response == PaginatedResponse<HighlightSearchResult>
                 URLQueryItem(name: "has_notes", value: query.hasNotesOnly ? "true" : nil),
                 URLQueryItem(name: "mode", value: query.mode == .semantic ? query.mode.rawValue : nil),
                 URLQueryItem(name: "sort", value: query.sort.rawValue),
-                URLQueryItem(name: "page", value: "\(page.page)"),
-                URLQueryItem(name: "limit", value: "\(page.limit)")
+                URLQueryItem(name: "limit", value: "\(page.limit)"),
+                URLQueryItem(name: "offset", value: "\(max(page.page - 1, 0) * page.limit)")
             ].compactMap { $0.value == nil ? nil : $0 }
         )
     }

@@ -1,0 +1,15 @@
+// Copy this file to Config/Local.xcconfig and update the values for this Mac.
+// Xcode picks it up automatically because Debug.xcconfig and Release.xcconfig
+// include Local.xcconfig if it exists.
+
+DEVELOPMENT_TEAM = YOURTEAMID
+PRODUCT_BUNDLE_IDENTIFIER = com.yourcompany.fragmenta
+FRAGMENTA_SHARE_EXTENSION_BUNDLE_IDENTIFIER = $(PRODUCT_BUNDLE_IDENTIFIER).share
+FRAGMENTA_APP_GROUP_IDENTIFIER = group.$(PRODUCT_BUNDLE_IDENTIFIER).shared
+
+// Simulator example:
+FRAGMENTA_API_BASE_URL = http:$(FORWARD_SLASH)$(FORWARD_SLASH)127.0.0.1:3000
+
+// Device or production examples:
+// FRAGMENTA_API_BASE_URL = http:$(FORWARD_SLASH)$(FORWARD_SLASH)192.168.1.25:3000
+// FRAGMENTA_API_BASE_URL = https:$(FORWARD_SLASH)$(FORWARD_SLASH)your-production-host.example.com

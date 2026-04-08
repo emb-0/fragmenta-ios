@@ -76,11 +76,13 @@ struct PaginatedResponse<Item: Codable & Hashable & Sendable>: Codable, Hashable
         if let nestedPageInfo = try container.decodeFirstPresent(PageInfo.self, keys: ["pagination", "page_info", "pageInfo", "meta"]) {
             self.pageInfo = nestedPageInfo
         } else {
-            let page = try container.decodeFirstPresent(Int.self, keys: ["page", "current_page"]) ?? 1
             let limit = try container.decodeFirstPresent(Int.self, keys: ["limit", "per_page"]) ?? max(items.count, 1)
+            let offset = try container.decodeFirstPresent(Int.self, keys: ["offset", "start"]) ?? 0
+            let page = try container.decodeFirstPresent(Int.self, keys: ["page", "current_page"])
+                ?? max((offset / max(limit, 1)) + 1, 1)
             let total = try container.decodeIfPresent(Int.self, forKey: AnyCodingKey("total"))
             let hasMore = try container.decodeFirstPresent(Bool.self, keys: ["has_more", "hasMore"])
-                ?? ((total.map { page * limit < $0 }) ?? false)
+                ?? ((total.map { offset + items.count < $0 }) ?? (items.count >= limit && items.isEmpty == false))
             let nextPage = try container.decodeFirstPresent(Int.self, keys: ["next_page", "nextPage"])
                 ?? (hasMore ? page + 1 : nil)
 

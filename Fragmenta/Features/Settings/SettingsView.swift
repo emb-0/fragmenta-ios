@@ -62,7 +62,7 @@ struct SettingsView: View {
                 .font(FragmentaTypography.sectionTitle)
                 .foregroundStyle(FragmentaColor.textPrimary)
 
-            Text("Fragmenta is the native reading artifact for Kindle exports parsed by fragmenta-core. Sprint 6 adds insights, collections, backend share cards, AI-backed discovery surfaces, and deeper cache resilience without shifting the app away from its calm reading focus.")
+            Text("Fragmenta is the native reading artifact for Kindle exports parsed by fragmenta-core. Sprint 7 tightens config, backend compatibility, share-ingest readiness, and compile stability so this Mac can focus on real validation instead of setup churn.")
                 .font(FragmentaTypography.body)
                 .foregroundStyle(FragmentaColor.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -82,7 +82,7 @@ struct SettingsView: View {
                 .font(FragmentaTypography.sectionTitle)
                 .foregroundStyle(FragmentaColor.textPrimary)
 
-            Text("Fragmenta currently speaks to a public fragmenta-core API without auth. Debug builds can override the base URL locally.")
+            Text("Fragmenta currently speaks to a public fragmenta-core API without auth. Debug builds can override the base URL locally for simulator, device, or production validation.")
                 .font(FragmentaTypography.body)
                 .foregroundStyle(FragmentaColor.textSecondary)
 

@@ -1,3 +1,5 @@
 #include "Base.xcconfig"
 
-FRAGMENTA_API_BASE_URL = https://fragmenta-core.example.com
+FRAGMENTA_API_BASE_URL = https:$(FORWARD_SLASH)$(FORWARD_SLASH)fragmenta-core.example.com
+
+#include? "Local.xcconfig"

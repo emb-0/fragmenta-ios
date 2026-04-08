@@ -147,7 +147,17 @@ struct Book: Codable, Identifiable, Hashable, Sendable {
         init(from decoder: Decoder) throws {
             let container = try decoder.singleValueContainer()
             let rawValue = try container.decode(String.self)
-            self = Source(rawValue: rawValue) ?? .unknown
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .lowercased()
+
+            switch rawValue {
+            case "kindle_export", "kindle_txt", "kindle_text", "kindle_notebook":
+                self = .kindleExport
+            case "manual_import":
+                self = .manualImport
+            default:
+                self = .unknown
+            }
         }
 
         func encode(to encoder: Encoder) throws {
@@ -200,14 +210,14 @@ struct Book: Codable, Identifiable, Hashable, Sendable {
 
         self.init(
             id: try container.decode(String.self, forKey: AnyCodingKey("id")),
-            title: try container.decode(String.self, forKey: AnyCodingKey("title")),
-            author: try container.decodeIfPresent(String.self, forKey: AnyCodingKey("author")),
-            source: try container.decodeIfPresent(Source.self, forKey: AnyCodingKey("source")) ?? .unknown,
+            title: try container.decodeFirstPresent(String.self, keys: ["title", "canonical_title", "name"]) ?? "Untitled",
+            author: try container.decodeFirstPresent(String.self, keys: ["author", "canonical_author"]),
+            source: try container.decodeFirstPresent(Source.self, keys: ["source", "source_type"]) ?? .unknown,
             highlightCount: try container.decodeFirstPresent(Int.self, keys: ["highlight_count", "highlights_count"]) ?? 0,
             noteCount: try container.decodeFirstPresent(Int.self, keys: ["note_count", "notes_count"]),
             cover: try BookCover.resolve(from: container),
             synopsis: try container.decodeFirstPresent(String.self, keys: ["synopsis", "description", "subtitle"]),
-            lastImportedAt: try container.decodeIfPresent(Date.self, forKey: AnyCodingKey("last_imported_at")),
+            lastImportedAt: try container.decodeFirstPresent(Date.self, keys: ["last_imported_at", "first_imported_at"]),
             createdAt: try container.decodeIfPresent(Date.self, forKey: AnyCodingKey("created_at")),
             updatedAt: try container.decodeIfPresent(Date.self, forKey: AnyCodingKey("updated_at"))
         )
@@ -259,6 +269,21 @@ struct BookReference: Codable, Hashable, Sendable {
     let id: String
     let title: String
     let author: String?
+
+    init(id: String, title: String, author: String?) {
+        self.id = id
+        self.title = title
+        self.author = author
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: AnyCodingKey.self)
+        self.init(
+            id: try container.decode(String.self, forKey: AnyCodingKey("id")),
+            title: try container.decodeFirstPresent(String.self, keys: ["title", "canonical_title", "name"]) ?? "Untitled",
+            author: try container.decodeFirstPresent(String.self, keys: ["author", "canonical_author"])
+        )
+    }
 
     var displayAuthor: String {
         let trimmedAuthor = author?.trimmed ?? ""

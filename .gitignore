@@ -3,3 +3,4 @@ DerivedData/
 *.xcworkspace
 xcuserdata/
 *.xcuserstate
+Config/Local.xcconfig

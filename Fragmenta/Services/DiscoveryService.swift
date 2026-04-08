@@ -85,7 +85,7 @@ struct DiscoveryService: DiscoveryServiceProtocol {
             return false
         }
 
-        return [400, 404, 405, 501].contains(statusCode)
+        return [400, 404, 405, 501, 503].contains(statusCode)
     }
 }
 

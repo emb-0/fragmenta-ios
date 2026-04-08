@@ -41,7 +41,7 @@ struct ShareCardService: ShareCardServiceProtocol {
         }
 
         do {
-            let response = try await apiClient.download(path: "/api/highlights/\(highlightID)/share-card")
+            let response = try await downloadShareCard(highlightID: highlightID)
             let fileURL = response.filename
                 .map { directoryURL.appendingPathComponent($0) }
                 ?? cachedURL
@@ -84,5 +84,38 @@ struct ShareCardService: ShareCardServiceProtocol {
         }
 
         return error.localizedDescription
+    }
+
+    private func downloadShareCard(highlightID: String) async throws -> DownloadedResponse {
+        let candidates: [(path: String, queryItems: [URLQueryItem])] = [
+            ("/api/highlights/\(highlightID)/share-card", []),
+            ("/api/share/highlight/\(highlightID)", [URLQueryItem(name: "download", value: "1")])
+        ]
+
+        var fallbackError: Error?
+
+        for candidate in candidates {
+            do {
+                return try await apiClient.download(path: candidate.path, queryItems: candidate.queryItems)
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch {
+                guard Self.shouldTryFallback(after: error) else {
+                    throw error
+                }
+
+                fallbackError = error
+            }
+        }
+
+        throw fallbackError ?? APIError.transport(statusCode: -1, message: "Unable to download share card.")
+    }
+
+    private static func shouldTryFallback(after error: Error) -> Bool {
+        guard let apiError = error as? APIError, let statusCode = apiError.statusCode else {
+            return false
+        }
+
+        return [400, 404, 405].contains(statusCode)
     }
 }

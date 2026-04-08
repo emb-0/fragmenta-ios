@@ -69,11 +69,30 @@ struct CollectionsService: CollectionsServiceProtocol {
     }
 
     func fetchCollections(forBookID bookID: String, page: PageRequest = PageRequest(page: 1, limit: 50)) async throws -> PaginatedResponse<Collection> {
-        let response: PaginatedResponse<Collection> = try await apiClient.request(.collections(bookID: bookID, page: page))
-        if page.page == 1 {
-            try await cacheStore.save(response.items, forKey: CacheKey.bookCollections(bookID))
+        do {
+            let response: PaginatedResponse<Collection> = try await apiClient.request(.collections(bookID: bookID, page: page))
+            if page.page == 1 {
+                try await cacheStore.save(response.items, forKey: CacheKey.bookCollections(bookID))
+            }
+            return response
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            guard Self.shouldUseMembershipFallback(error) else {
+                throw error
+            }
+
+            let response = try await fetchCollectionsMembershipFallback(forBookID: bookID, page: page)
+            if page.page == 1 {
+                try await cacheStore.save(response.items, forKey: CacheKey.bookCollections(bookID))
+            }
+            diagnosticsStore.record(
+                event: .collections,
+                status: .success,
+                detail: "Resolved membership for book \(bookID) via collection detail fallback."
+            )
+            return response
         }
-        return response
     }
 
     func addBook(_ bookID: String, toCollection collectionID: String) async throws {
@@ -130,6 +149,61 @@ struct CollectionsService: CollectionsServiceProtocol {
         }
 
         return error.localizedDescription
+    }
+
+    private func fetchCollectionsMembershipFallback(
+        forBookID bookID: String,
+        page: PageRequest
+    ) async throws -> PaginatedResponse<Collection> {
+        let collectionsResponse = try await fetchCollections(page: page)
+        var resolvedCollections = [Collection]()
+        resolvedCollections.reserveCapacity(collectionsResponse.items.count)
+
+        for collection in collectionsResponse.items {
+            if let detail = try? await fetchCollectionDetail(id: collection.id) {
+                resolvedCollections.append(
+                    Collection(
+                        id: collection.id,
+                        title: collection.title,
+                        summary: collection.summary,
+                        tags: collection.tags,
+                        bookCount: detail.bookCount,
+                        highlightCount: detail.highlightCount,
+                        noteCount: detail.noteCount,
+                        containsBook: detail.books.contains(where: { $0.id == bookID }),
+                        previewBooks: collection.previewBooks.isEmpty ? Array(detail.books.prefix(3)) : collection.previewBooks,
+                        createdAt: collection.createdAt ?? detail.createdAt,
+                        updatedAt: detail.updatedAt ?? collection.updatedAt
+                    )
+                )
+            } else {
+                resolvedCollections.append(
+                    Collection(
+                        id: collection.id,
+                        title: collection.title,
+                        summary: collection.summary,
+                        tags: collection.tags,
+                        bookCount: collection.bookCount,
+                        highlightCount: collection.highlightCount,
+                        noteCount: collection.noteCount,
+                        containsBook: false,
+                        previewBooks: collection.previewBooks,
+                        createdAt: collection.createdAt,
+                        updatedAt: collection.updatedAt
+                    )
+                )
+            }
+        }
+
+        return PaginatedResponse(items: resolvedCollections, pageInfo: collectionsResponse.pageInfo)
+    }
+
+    private static func shouldUseMembershipFallback(_ error: Error) -> Bool {
+        guard let apiError = error as? APIError, let statusCode = apiError.statusCode else {
+            return false
+        }
+
+        return [404, 405].contains(statusCode)
     }
 }
 

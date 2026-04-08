@@ -106,7 +106,7 @@ struct LibraryView: View {
     private func journalContent(displayedBooks: [Book]) -> some View {
         let shelves = featuredShelves(for: displayedBooks)
 
-        VStack(alignment: .leading, spacing: FragmentaSpacing.xxLarge) {
+        return VStack(alignment: .leading, spacing: FragmentaSpacing.xxLarge) {
             ForEach(shelves) { shelf in
                 VStack(alignment: .leading, spacing: FragmentaSpacing.medium) {
                     LibrarySectionHeading(title: shelf.title, subtitle: shelf.subtitle)
@@ -135,7 +135,7 @@ struct LibraryView: View {
     private func bookshelfContent(displayedBooks: [Book]) -> some View {
         let frontShelfBooks = featuredBooks(for: displayedBooks)
 
-        VStack(alignment: .leading, spacing: FragmentaSpacing.xxLarge) {
+        return VStack(alignment: .leading, spacing: FragmentaSpacing.xxLarge) {
             if frontShelfBooks.isEmpty == false {
                 VStack(alignment: .leading, spacing: FragmentaSpacing.medium) {
                     LibrarySectionHeading(

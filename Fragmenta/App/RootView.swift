@@ -19,6 +19,17 @@ struct RootView: View {
             .tag(RootTab.library)
 
             NavigationStack {
+                InsightsView(
+                    insightsService: container.insightsService,
+                    booksService: container.booksService
+                )
+            }
+            .tabItem {
+                Label(RootTab.insights.title, systemImage: RootTab.insights.systemImage)
+            }
+            .tag(RootTab.insights)
+
+            NavigationStack {
                 SearchView(
                     searchService: container.searchService,
                     booksService: container.booksService

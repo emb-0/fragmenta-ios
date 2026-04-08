@@ -52,6 +52,18 @@ final class BookDetailViewModel: ObservableObject {
         }
     }
 
+    func focus(highlightID: String) {
+        focusedHighlightID = highlightID
+
+        guard highlightsState.value?.contains(where: { $0.id == highlightID }) == false else {
+            return
+        }
+
+        Task { [weak self] in
+            await self?.loadFocusedHighlight(id: highlightID)
+        }
+    }
+
     func loadMoreIfNeeded(currentHighlight: Highlight) {
         guard
             let highlights = highlightsState.value,
@@ -180,6 +192,17 @@ final class BookDetailViewModel: ObservableObject {
         }
 
         return [focusedHighlight] + existing
+    }
+
+    private func loadFocusedHighlight(id: String) async {
+        do {
+            let focusedHighlight = try await booksService.fetchHighlight(id: id)
+            let merged = mergeHighlights(existing: highlightsState.value ?? [], inserting: focusedHighlight)
+            highlightsState = .loaded(merged, source: highlightsState.source ?? .remote)
+            focusedHighlightID = focusedHighlight.id
+        } catch {
+            focusedHighlightID = id
+        }
     }
 
     private static func errorMessage(for error: Error) -> String {

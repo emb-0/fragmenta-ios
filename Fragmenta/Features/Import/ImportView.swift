@@ -138,6 +138,10 @@ struct ImportView: View {
                 FileSelectionCard(importedFile: importedFile)
             }
 
+            if let importedFile = viewModel.importedFile, importedFile.source != .pastedText {
+                IncomingDraftStatusRow(importedFile: importedFile)
+            }
+
             ImportDraftStats(
                 rawText: viewModel.rawText,
                 sourceMode: viewModel.sourceMode,
@@ -299,6 +303,10 @@ struct ImportView: View {
         case .importing:
             return "Importing..."
         default:
+            if let importedFile = viewModel.importedFile, importedFile.source != .pastedText {
+                return "Preview Incoming Import"
+            }
+
             return "Preview Import"
         }
     }
@@ -418,6 +426,24 @@ private struct FileSelectionCard: View {
             Text(importedFile.receivedAt.fragmentaDayMonthYearString())
                 .font(FragmentaTypography.caption)
                 .foregroundStyle(FragmentaColor.textTertiary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .insetSurfaceStyle()
+    }
+}
+
+private struct IncomingDraftStatusRow: View {
+    let importedFile: ImportedTextFile
+
+    var body: some View {
+        HStack(spacing: FragmentaSpacing.small) {
+            Image(systemName: "arrow.down.doc")
+                .foregroundStyle(FragmentaColor.accentSoft)
+
+            Text("Incoming \(importedFile.source.title.lowercased()) is staged locally first, then previewed before the backend commit.")
+                .font(FragmentaTypography.metadata)
+                .foregroundStyle(FragmentaColor.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .insetSurfaceStyle()

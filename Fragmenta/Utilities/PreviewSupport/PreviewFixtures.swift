@@ -122,7 +122,9 @@ enum PreviewFixtures {
             matchedTerms: ["attention", "astonished"],
             snippet: "Instructions for living a life: Pay attention. Be astonished. Tell about it.",
             matchedInNote: true,
-            matchedField: "note"
+            matchedField: "note",
+            matchReason: "Theme match",
+            semanticScore: 0.94
         ),
         HighlightSearchResult(
             highlight: highlights[1],
@@ -130,7 +132,9 @@ enum PreviewFixtures {
             matchedTerms: ["world", "imagination"],
             snippet: "Whoever you are, no matter how lonely, the world offers itself to your imagination.",
             matchedInNote: false,
-            matchedField: "text"
+            matchedField: "text",
+            matchReason: "Phrase match",
+            semanticScore: 0.82
         )
     ]
 
@@ -219,6 +223,106 @@ enum PreviewFixtures {
         fileURL: URL(fileURLWithPath: "/tmp/fragmenta-preview.md"),
         generatedAt: Date(),
         byteCount: 4_096
+    )
+
+    static let readingInsights = ReadingInsights(
+        totals: ReadingInsights.Totals(
+            bookCount: books.count,
+            highlightCount: books.reduce(0) { $0 + $1.highlightCount },
+            noteCount: books.reduce(0) { $0 + ($1.noteCount ?? 0) },
+            currentStreakDays: 6,
+            activeDays: 18,
+            averageHighlightsPerWeek: 12.4,
+            averageNotesPerWeek: 3.1,
+            paceSummary: "Reading has stayed steady this month, with notes clustering around the books that invite slower re-reading."
+        ),
+        activity: [
+            ReadingInsights.ActivityPoint(date: Date().addingTimeInterval(-86_400 * 6), highlightCount: 3, noteCount: 1),
+            ReadingInsights.ActivityPoint(date: Date().addingTimeInterval(-86_400 * 5), highlightCount: 6, noteCount: 2),
+            ReadingInsights.ActivityPoint(date: Date().addingTimeInterval(-86_400 * 4), highlightCount: 4, noteCount: 1),
+            ReadingInsights.ActivityPoint(date: Date().addingTimeInterval(-86_400 * 3), highlightCount: 7, noteCount: 3),
+            ReadingInsights.ActivityPoint(date: Date().addingTimeInterval(-86_400 * 2), highlightCount: 5, noteCount: 2),
+            ReadingInsights.ActivityPoint(date: Date().addingTimeInterval(-86_400), highlightCount: 8, noteCount: 2)
+        ],
+        topAnnotatedBooks: books,
+        topAnnotatedPassages: [
+            ReadingInsights.Passage(
+                id: "passage_preview_1",
+                highlight: highlights[0],
+                book: highlights[0].book,
+                annotationCount: 4,
+                summary: "A line that anchors the tone of the whole library."
+            )
+        ],
+        generatedAt: Date()
+    )
+
+    static let collections: [Collection] = [
+        Collection(
+            id: "collection_margins",
+            title: "Books with Marginalia",
+            summary: "The books that keep generating notes alongside the original highlights.",
+            tags: ["notes", "reflection"],
+            bookCount: 2,
+            highlightCount: 113,
+            noteCount: 24,
+            containsBook: true,
+            previewBooks: [books[0], books[2]],
+            createdAt: Date().addingTimeInterval(-86_400 * 40),
+            updatedAt: Date().addingTimeInterval(-86_400 * 2)
+        ),
+        Collection(
+            id: "collection_nature",
+            title: "Attentive Nature Writing",
+            summary: "Field notes, devotional looking, and sentences that make attention feel physical.",
+            tags: ["nature", "essay"],
+            bookCount: 2,
+            highlightCount: 127,
+            noteCount: 19,
+            containsBook: false,
+            previewBooks: [books[0], books[1]],
+            createdAt: Date().addingTimeInterval(-86_400 * 90),
+            updatedAt: Date().addingTimeInterval(-86_400 * 8)
+        )
+    ]
+
+    static let collectionDetail = CollectionDetail(
+        id: collections[0].id,
+        title: collections[0].title,
+        summary: collections[0].summary,
+        tags: collections[0].tags,
+        books: [books[0], books[2]],
+        bookCount: 2,
+        highlightCount: 113,
+        noteCount: 24,
+        createdAt: collections[0].createdAt,
+        updatedAt: collections[0].updatedAt
+    )
+
+    static let bookDiscovery = BookDiscovery(
+        summary: "Mary Oliver’s highlights here repeatedly orbit attention, astonishment, and a desire to turn private noticing back outward.",
+        themes: [
+            BookDiscovery.Theme(title: "Attention"),
+            BookDiscovery.Theme(title: "Wonder"),
+            BookDiscovery.Theme(title: "Witness")
+        ],
+        relatedHighlights: [
+            BookDiscovery.RelatedHighlight(
+                highlight: highlights[1],
+                book: highlights[1].book,
+                reason: "Echoes the same imaginative openness as the focused passage.",
+                score: 0.89
+            )
+        ],
+        updatedAt: Date()
+    )
+
+    static let shareCardArtifact = ShareCardArtifact(
+        highlightID: highlights[0].id,
+        fileURL: URL(fileURLWithPath: "/tmp/fragmenta-share-card-preview.png"),
+        generatedAt: Date(),
+        byteCount: 2_048,
+        mimeType: "image/png"
     )
 }
 #endif

@@ -38,8 +38,74 @@ struct PreviewSearchService: SearchServiceProtocol {
 
     func clearRecentSearches() {}
 
+    func loadCachedSearchResults(query: SearchQuery, page: PageRequest) async -> PaginatedResponse<HighlightSearchResult>? {
+        PreviewFixtures.searchPage
+    }
+
     func searchHighlights(query: SearchQuery, page: PageRequest) async throws -> PaginatedResponse<HighlightSearchResult> {
         PreviewFixtures.searchPage
+    }
+}
+
+struct PreviewInsightsService: InsightsServiceProtocol {
+    func loadCachedInsights() async -> ReadingInsights? {
+        PreviewFixtures.readingInsights
+    }
+
+    func fetchInsights() async throws -> ReadingInsights {
+        PreviewFixtures.readingInsights
+    }
+}
+
+struct PreviewCollectionsService: CollectionsServiceProtocol {
+    func loadCachedCollections() async -> [Collection]? {
+        PreviewFixtures.collections
+    }
+
+    func fetchCollections(page: PageRequest) async throws -> PaginatedResponse<Collection> {
+        PaginatedResponse(
+            items: PreviewFixtures.collections,
+            pageInfo: PageInfo.singlePage(itemCount: PreviewFixtures.collections.count, limit: page.limit)
+        )
+    }
+
+    func loadCachedCollectionDetail(id: String) async -> CollectionDetail? {
+        PreviewFixtures.collectionDetail
+    }
+
+    func fetchCollectionDetail(id: String) async throws -> CollectionDetail {
+        PreviewFixtures.collectionDetail
+    }
+
+    func loadCachedCollections(forBookID bookID: String) async -> [Collection]? {
+        PreviewFixtures.collections.filter { $0.containsBook == true }
+    }
+
+    func fetchCollections(forBookID bookID: String, page: PageRequest) async throws -> PaginatedResponse<Collection> {
+        PaginatedResponse(
+            items: PreviewFixtures.collections.filter { $0.containsBook == true },
+            pageInfo: PageInfo.singlePage(itemCount: PreviewFixtures.collections.filter { $0.containsBook == true }.count, limit: page.limit)
+        )
+    }
+
+    func addBook(_ bookID: String, toCollection collectionID: String) async throws {}
+
+    func removeBook(_ bookID: String, fromCollection collectionID: String) async throws {}
+}
+
+struct PreviewDiscoveryService: DiscoveryServiceProtocol {
+    func loadCachedBookDiscovery(bookID: String) async -> BookDiscovery? {
+        PreviewFixtures.bookDiscovery
+    }
+
+    func fetchBookDiscovery(bookID: String) async throws -> BookDiscovery {
+        PreviewFixtures.bookDiscovery
+    }
+}
+
+struct PreviewShareCardService: ShareCardServiceProtocol {
+    func fetchShareCard(highlightID: String) async throws -> ShareCardArtifact {
+        PreviewFixtures.shareCardArtifact
     }
 }
 
@@ -88,8 +154,8 @@ extension AppConfig {
         defaultAPIBaseURL: URL(string: "https://preview.fragmenta.local")!,
         requestTimeout: 20,
         appDisplayName: "Fragmenta",
-        appVersion: "0.5.0",
-        buildNumber: "5",
+        appVersion: "0.6.0",
+        buildNumber: "6",
         appGroupIdentifier: "group.preview.fragmenta"
     )
 }
@@ -102,7 +168,11 @@ extension AppContainer {
         diagnosticsStore: DiagnosticsStore(),
         sharedImportStore: SharedImportStore(appGroupIdentifier: AppConfig.preview.appGroupIdentifier),
         booksService: PreviewBooksService(),
+        insightsService: PreviewInsightsService(),
+        collectionsService: PreviewCollectionsService(),
         searchService: PreviewSearchService(),
+        discoveryService: PreviewDiscoveryService(),
+        shareCardService: PreviewShareCardService(),
         importService: PreviewImportService(),
         exportService: PreviewExportService()
     )

@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct LibraryView: View {
+    @EnvironmentObject private var appState: AppState
     @StateObject private var viewModel: LibraryViewModel
     private let booksService: BooksServiceProtocol
 
@@ -42,6 +43,20 @@ struct LibraryView: View {
         .navigationTitle("Library")
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(.hidden, for: .navigationBar)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                NavigationLink {
+                    CollectionsView(
+                        collectionsService: appState.container.collectionsService,
+                        booksService: booksService
+                    )
+                } label: {
+                    Image(systemName: "square.stack.3d.up")
+                        .font(.system(size: 15, weight: .semibold, design: .rounded))
+                        .foregroundStyle(FragmentaColor.textSecondary)
+                }
+            }
+        }
         .animation(.easeInOut(duration: 0.22), value: viewModel.viewMode)
         .task {
             viewModel.loadIfNeeded()

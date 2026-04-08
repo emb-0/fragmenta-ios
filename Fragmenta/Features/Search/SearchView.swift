@@ -30,6 +30,8 @@ struct SearchView: View {
                             get: { viewModel.query.text },
                             set: { viewModel.setQueryText($0) }
                         ),
+                        mode: viewModel.query.mode,
+                        setMode: { viewModel.setMode($0) },
                         hasFilters: viewModel.query.hasActiveFilters
                     )
 
@@ -87,7 +89,7 @@ struct SearchView: View {
             }
         } else {
             VStack(alignment: .leading, spacing: FragmentaSpacing.medium) {
-                SearchResultsSummary(resultCount: results.count, state: viewModel.state)
+                SearchResultsSummary(resultCount: results.count, state: viewModel.state, mode: viewModel.query.mode)
 
                 LazyVStack(spacing: FragmentaSpacing.large) {
                     ForEach(results) { result in
@@ -120,6 +122,8 @@ struct SearchView: View {
 
 private struct SearchComposer: View {
     @Binding var text: String
+    let mode: SearchQuery.Mode
+    let setMode: (SearchQuery.Mode) -> Void
     let hasFilters: Bool
 
     var body: some View {
@@ -145,6 +149,20 @@ private struct SearchComposer: View {
                 }
             }
             .fieldSurfaceStyle()
+
+            HStack(spacing: FragmentaSpacing.small) {
+                ForEach(SearchQuery.Mode.allCases) { candidate in
+                    Button {
+                        setMode(candidate)
+                    } label: {
+                        Text(candidate.title)
+                            .font(FragmentaTypography.metadata)
+                            .foregroundStyle(mode == candidate ? FragmentaColor.textPrimary : FragmentaColor.textSecondary)
+                            .chipSurfaceStyle()
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
 
             Text(hasFilters ? "Filters are active, so search can run even without a typed phrase." : "Type a remembered line and let the backend narrow it down.")
                 .font(FragmentaTypography.metadata)
@@ -261,6 +279,7 @@ private struct SearchFilterCard: View {
 private struct SearchResultsSummary: View {
     let resultCount: Int
     let state: LoadableState<[HighlightSearchResult]>
+    let mode: SearchQuery.Mode
 
     var body: some View {
         switch state {
@@ -277,9 +296,16 @@ private struct SearchResultsSummary: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .insetSurfaceStyle()
         default:
-            Text(resultCount == 1 ? "1 result" : "\(resultCount) results")
-                .font(FragmentaTypography.metadata)
-                .foregroundStyle(FragmentaColor.textSecondary)
+            HStack(spacing: FragmentaSpacing.small) {
+                Text(resultCount == 1 ? "1 result" : "\(resultCount) results")
+                    .font(FragmentaTypography.metadata)
+                    .foregroundStyle(FragmentaColor.textSecondary)
+
+                Text(mode == .semantic ? "Semantic" : "Exact")
+                    .font(FragmentaTypography.chip)
+                    .foregroundStyle(mode == .semantic ? FragmentaColor.accentSoft : FragmentaColor.textTertiary)
+                    .chipSurfaceStyle()
+            }
         }
     }
 }

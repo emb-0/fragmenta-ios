@@ -35,8 +35,8 @@ targets:
       base:
         PRODUCT_NAME: Fragmenta
         PRODUCT_BUNDLE_IDENTIFIER: com.fragmenta.ios
-        MARKETING_VERSION: 0.5.0
-        CURRENT_PROJECT_VERSION: 5
+        MARKETING_VERSION: 0.6.0
+        CURRENT_PROJECT_VERSION: 6
         CODE_SIGN_ENTITLEMENTS: Config/Fragmenta.entitlements
     dependencies:
       - target: FragmentaShareExtension
@@ -59,8 +59,8 @@ targets:
       base:
         PRODUCT_NAME: FragmentaShareExtension
         PRODUCT_BUNDLE_IDENTIFIER: $(FRAGMENTA_SHARE_EXTENSION_BUNDLE_IDENTIFIER)
-        MARKETING_VERSION: 0.5.0
-        CURRENT_PROJECT_VERSION: 5
+        MARKETING_VERSION: 0.6.0
+        CURRENT_PROJECT_VERSION: 6
         INFOPLIST_FILE: Config/ShareExtension-Info.plist
         CODE_SIGN_ENTITLEMENTS: Config/FragmentaShareExtension.entitlements
         APPLICATION_EXTENSION_API_ONLY: YES

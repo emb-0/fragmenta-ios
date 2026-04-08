@@ -3,20 +3,24 @@ import Foundation
 protocol SearchServiceProtocol {
     func recentSearches(limit: Int) -> [String]
     func clearRecentSearches()
+    func loadCachedSearchResults(query: SearchQuery, page: PageRequest) async -> PaginatedResponse<HighlightSearchResult>?
     func searchHighlights(query: SearchQuery, page: PageRequest) async throws -> PaginatedResponse<HighlightSearchResult>
 }
 
 struct SearchService: SearchServiceProtocol {
     private let apiClient: APIClient
+    private let cacheStore: FragmentaCacheStore
     private let preferencesStore: AppPreferencesStore
     private let diagnosticsStore: DiagnosticsStore
 
     init(
         apiClient: APIClient,
+        cacheStore: FragmentaCacheStore,
         preferencesStore: AppPreferencesStore,
         diagnosticsStore: DiagnosticsStore
     ) {
         self.apiClient = apiClient
+        self.cacheStore = cacheStore
         self.preferencesStore = preferencesStore
         self.diagnosticsStore = diagnosticsStore
     }
@@ -29,6 +33,10 @@ struct SearchService: SearchServiceProtocol {
         preferencesStore.clearRecentSearches()
     }
 
+    func loadCachedSearchResults(query: SearchQuery, page: PageRequest) async -> PaginatedResponse<HighlightSearchResult>? {
+        await cacheStore.load(PaginatedResponse<HighlightSearchResult>.self, forKey: CacheKey.results(query: query, page: page))
+    }
+
     func searchHighlights(query: SearchQuery, page: PageRequest) async throws -> PaginatedResponse<HighlightSearchResult> {
         let trimmedQuery = query.trimmedText
         let hasFilters = query.hasActiveFilters
@@ -39,6 +47,7 @@ struct SearchService: SearchServiceProtocol {
 
         do {
             let response: PaginatedResponse<HighlightSearchResult> = try await apiClient.request(.search(query: query, page: page))
+            try await cacheStore.save(response, forKey: CacheKey.results(query: query, page: page))
             if trimmedQuery.isEmpty == false {
                 preferencesStore.saveRecentSearch(trimmedQuery)
             }
@@ -69,18 +78,26 @@ struct SearchService: SearchServiceProtocol {
     }
 
     private static func diagnosticsMessage(for query: SearchQuery, resultCount: Int) -> String {
+        let modeDescriptor = query.mode == .semantic ? "semantic " : ""
+
         if query.trimmedText.isEmpty == false {
-            return "Search for “\(query.trimmedText)” returned \(resultCount) results."
+            return "\(modeDescriptor.capitalized)search for “\(query.trimmedText)” returned \(resultCount) results."
         }
 
         if let bookID = query.bookID {
-            return "Filtered search for book \(bookID) returned \(resultCount) results."
+            return "\(modeDescriptor.capitalized)filtered search for book \(bookID) returned \(resultCount) results."
         }
 
         if query.author.isBlank == false {
-            return "Author-filtered search for \(query.author.trimmed) returned \(resultCount) results."
+            return "\(modeDescriptor.capitalized)author-filtered search for \(query.author.trimmed) returned \(resultCount) results."
         }
 
-        return "Filtered search returned \(resultCount) results."
+        return "\(modeDescriptor.capitalized)filtered search returned \(resultCount) results."
+    }
+}
+
+private enum CacheKey {
+    static func results(query: SearchQuery, page: PageRequest) -> String {
+        "search-\(query.mode.rawValue)-\(query.sort.rawValue)-book:\(query.bookID ?? "all")-author:\(query.author.trimmed)-notes:\(query.hasNotesOnly)-text:\(query.trimmedText)-page:\(page.page)-limit:\(page.limit)"
     }
 }

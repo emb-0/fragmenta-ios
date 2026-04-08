@@ -59,10 +59,21 @@ struct SearchResultRowView: View {
                     metadataChip(locationLabel)
                 }
 
+                if let matchReason = result.matchReason, matchReason.isBlank == false {
+                    metadataChip(matchReason)
+                }
+
                 if result.matchedInNote == true {
                     Text("Note match")
                         .font(FragmentaTypography.chip)
                         .foregroundStyle(FragmentaColor.accentSoft)
+                        .chipSurfaceStyle()
+                }
+
+                if let semanticScore = result.semanticScore {
+                    Text(String(format: "%.2f", semanticScore))
+                        .font(FragmentaTypography.chip)
+                        .foregroundStyle(FragmentaColor.textTertiary)
                         .chipSurfaceStyle()
                 }
 

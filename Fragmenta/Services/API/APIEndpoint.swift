@@ -74,6 +74,7 @@ extension APIEndpoint where Response == PaginatedResponse<HighlightSearchResult>
                 URLQueryItem(name: "book_id", value: query.bookID),
                 URLQueryItem(name: "author", value: query.author.isBlank ? nil : query.author.trimmed),
                 URLQueryItem(name: "has_notes", value: query.hasNotesOnly ? "true" : nil),
+                URLQueryItem(name: "mode", value: query.mode == .semantic ? query.mode.rawValue : nil),
                 URLQueryItem(name: "sort", value: query.sort.rawValue),
                 URLQueryItem(name: "page", value: "\(page.page)"),
                 URLQueryItem(name: "limit", value: "\(page.limit)")
@@ -124,4 +125,83 @@ extension APIEndpoint where Response == ImportRecord {
     static func importRecord(id: String) -> APIEndpoint<ImportRecord> {
         APIEndpoint(path: "/api/imports/\(id)")
     }
+}
+
+extension APIEndpoint where Response == ReadingInsights {
+    static func readingInsights() -> APIEndpoint<ReadingInsights> {
+        APIEndpoint(path: "/api/insights/reading")
+    }
+}
+
+extension APIEndpoint where Response == PaginatedResponse<Collection> {
+    static func collections(page: PageRequest = PageRequest(page: 1, limit: 50)) -> APIEndpoint<PaginatedResponse<Collection>> {
+        APIEndpoint(
+            path: "/api/collections",
+            queryItems: [
+                URLQueryItem(name: "page", value: "\(page.page)"),
+                URLQueryItem(name: "limit", value: "\(page.limit)")
+            ]
+        )
+    }
+
+    static func collections(bookID: String, page: PageRequest = PageRequest(page: 1, limit: 50)) -> APIEndpoint<PaginatedResponse<Collection>> {
+        APIEndpoint(
+            path: "/api/books/\(bookID)/collections",
+            queryItems: [
+                URLQueryItem(name: "page", value: "\(page.page)"),
+                URLQueryItem(name: "limit", value: "\(page.limit)")
+            ]
+        )
+    }
+}
+
+extension APIEndpoint where Response == CollectionDetail {
+    static func collection(id: String) -> APIEndpoint<CollectionDetail> {
+        APIEndpoint(path: "/api/collections/\(id)")
+    }
+}
+
+extension APIEndpoint where Response == EmptyAPIResponse {
+    static func addBook(toCollection collectionID: String, bookID: String) -> APIEndpoint<EmptyAPIResponse> {
+        APIEndpoint(
+            path: "/api/collections/\(collectionID)/books",
+            method: .post,
+            queryItems: [],
+            headers: [
+                "Content-Type": "application/json"
+            ],
+            body: AnyEncodable(CollectionBookMutationRequest(bookID: bookID)),
+            unwrapEnvelope: false
+        )
+    }
+
+    static func removeBook(fromCollection collectionID: String, bookID: String) -> APIEndpoint<EmptyAPIResponse> {
+        APIEndpoint(
+            path: "/api/collections/\(collectionID)/books/\(bookID)",
+            method: .delete,
+            unwrapEnvelope: false
+        )
+    }
+}
+
+extension APIEndpoint where Response == BookSummaryPayload {
+    static func bookSummary(id: String) -> APIEndpoint<BookSummaryPayload> {
+        APIEndpoint(path: "/api/books/\(id)/summary")
+    }
+}
+
+extension APIEndpoint where Response == PaginatedResponse<BookDiscovery.RelatedHighlight> {
+    static func relatedHighlights(bookID: String, page: PageRequest = PageRequest(page: 1, limit: 8)) -> APIEndpoint<PaginatedResponse<BookDiscovery.RelatedHighlight>> {
+        APIEndpoint(
+            path: "/api/books/\(bookID)/related-highlights",
+            queryItems: [
+                URLQueryItem(name: "page", value: "\(page.page)"),
+                URLQueryItem(name: "limit", value: "\(page.limit)")
+            ]
+        )
+    }
+}
+
+private struct CollectionBookMutationRequest: Encodable, Sendable {
+    let bookID: String
 }

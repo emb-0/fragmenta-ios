@@ -1,5 +1,9 @@
 import Foundation
 
+struct EmptyAPIResponse: Decodable, Sendable {
+    init() {}
+}
+
 struct DownloadedResponse: Sendable {
     let data: Data
     let filename: String?
@@ -39,6 +43,10 @@ final class APIClient {
         )
 
         if (200 ..< 300).contains(execution.response.statusCode) {
+            if execution.data.isEmpty, Response.self == EmptyAPIResponse.self {
+                return EmptyAPIResponse() as! Response
+            }
+
             do {
                 if endpoint.unwrapEnvelope {
                     return try decoder.decode(APIEnvelope<Response>.self, from: execution.data).data
@@ -173,6 +181,7 @@ final class APIClient {
 
         return config.apiBaseURL
     }
+}
 
 private extension String {
     var fragmentaSuggestedFilename: String? {

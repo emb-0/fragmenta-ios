@@ -2,7 +2,11 @@ import Foundation
 
 enum DiagnosticEventKind: String, Codable, Hashable, Sendable {
     case library
+    case insights
+    case collections
     case search
+    case discovery
+    case shareCard = "share_card"
     case importPreview = "import_preview"
     case importCommit = "import_commit"
     case exports
@@ -23,7 +27,11 @@ struct DiagnosticEvent: Codable, Hashable, Sendable {
 
 struct DiagnosticsSnapshot: Codable, Hashable, Sendable {
     var lastLibraryEvent: DiagnosticEvent?
+    var lastInsightsEvent: DiagnosticEvent?
+    var lastCollectionsEvent: DiagnosticEvent?
     var lastSearchEvent: DiagnosticEvent?
+    var lastDiscoveryEvent: DiagnosticEvent?
+    var lastShareCardEvent: DiagnosticEvent?
     var lastImportPreviewEvent: DiagnosticEvent?
     var lastImportCommitEvent: DiagnosticEvent?
     var lastExportEvent: DiagnosticEvent?
@@ -77,8 +85,16 @@ final class DiagnosticsStore {
         switch kind {
         case .library:
             snapshot.lastLibraryEvent = event
+        case .insights:
+            snapshot.lastInsightsEvent = event
+        case .collections:
+            snapshot.lastCollectionsEvent = event
         case .search:
             snapshot.lastSearchEvent = event
+        case .discovery:
+            snapshot.lastDiscoveryEvent = event
+        case .shareCard:
+            snapshot.lastShareCardEvent = event
         case .importPreview:
             snapshot.lastImportPreviewEvent = event
         case .importCommit:

@@ -4,11 +4,15 @@ import UIKit
 #endif
 
 struct HighlightCardView: View {
+    @EnvironmentObject private var appState: AppState
+
     let highlight: Highlight
     let citation: HighlightCitation?
     var isFocused = false
 
     @State private var copyFeedback: CopyFeedback?
+    @State private var shareCardState: LoadableState<ShareCardArtifact> = .idle
+    @State private var shareCardPreview: ShareCardArtifact?
 
     var body: some View {
         VStack(alignment: .leading, spacing: FragmentaSpacing.large) {
@@ -31,6 +35,11 @@ struct HighlightCardView: View {
             RoundedRectangle(cornerRadius: FragmentaRadius.hero, style: .continuous)
                 .stroke(isFocused ? FragmentaColor.accentSoft.opacity(0.35) : Color.clear, lineWidth: 1.2)
         )
+        .sheet(item: $shareCardPreview) { artifact in
+            ShareCardPreviewSheet(artifact: artifact)
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+        }
     }
 
     private var header: some View {
@@ -117,28 +126,56 @@ struct HighlightCardView: View {
     }
 
     private var actionRow: some View {
-        HStack(spacing: FragmentaSpacing.small) {
-            Button(copyFeedback == .plain ? "Copied" : "Copy") {
-                copyToPasteboard(highlight.shareBody, feedback: .plain)
-            }
-            .font(FragmentaTypography.metadata)
-            .foregroundStyle(copyFeedback == .plain ? FragmentaColor.textPrimary : FragmentaColor.textSecondary)
-            .chipSurfaceStyle()
-
-            if citation != nil {
-                Button(copyFeedback == .citation ? "Copied Citation" : "Copy Citation") {
-                    copyToPasteboard(highlight.copyBodyWithCitation(citation: citation), feedback: .citation)
+        VStack(alignment: .leading, spacing: FragmentaSpacing.small) {
+            HStack(spacing: FragmentaSpacing.small) {
+                Button(copyFeedback == .plain ? "Copied" : "Copy") {
+                    copyToPasteboard(highlight.shareBody, feedback: .plain)
                 }
                 .font(FragmentaTypography.metadata)
-                .foregroundStyle(copyFeedback == .citation ? FragmentaColor.textPrimary : FragmentaColor.textSecondary)
+                .foregroundStyle(copyFeedback == .plain ? FragmentaColor.textPrimary : FragmentaColor.textSecondary)
                 .chipSurfaceStyle()
-            }
 
-            ShareLink(item: highlight.shareBody(citation: citation)) {
-                Text("Share")
+                if citation != nil {
+                    Button(copyFeedback == .citation ? "Copied Citation" : "Copy Citation") {
+                        copyToPasteboard(highlight.copyBodyWithCitation(citation: citation), feedback: .citation)
+                    }
+                    .font(FragmentaTypography.metadata)
+                    .foregroundStyle(copyFeedback == .citation ? FragmentaColor.textPrimary : FragmentaColor.textSecondary)
+                    .chipSurfaceStyle()
+                }
+
+                ShareLink(item: highlight.shareBody(citation: citation)) {
+                    Text("Share")
+                        .font(FragmentaTypography.metadata)
+                        .foregroundStyle(FragmentaColor.textSecondary)
+                        .chipSurfaceStyle()
+                }
+
+                switch shareCardState {
+                case .loading:
+                    HStack(spacing: FragmentaSpacing.xSmall) {
+                        ProgressView()
+                            .tint(FragmentaColor.textPrimary)
+                        Text("Card")
+                    }
                     .font(FragmentaTypography.metadata)
                     .foregroundStyle(FragmentaColor.textSecondary)
                     .chipSurfaceStyle()
+                default:
+                    Button("Share Card") {
+                        prepareShareCard()
+                    }
+                    .font(FragmentaTypography.metadata)
+                    .foregroundStyle(FragmentaColor.textSecondary)
+                    .chipSurfaceStyle()
+                }
+            }
+
+            if case .failed(let message, _) = shareCardState {
+                Text(message)
+                    .font(FragmentaTypography.caption)
+                    .foregroundStyle(FragmentaColor.warning)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }
@@ -164,11 +201,84 @@ struct HighlightCardView: View {
             }
         }
     }
+
+    private func prepareShareCard() {
+        if let shareCardPreview {
+            self.shareCardPreview = shareCardPreview
+            return
+        }
+
+        shareCardState = .loading(previous: shareCardState.value)
+
+        Task { @MainActor in
+            do {
+                let artifact = try await appState.container.shareCardService.fetchShareCard(highlightID: highlight.id)
+                shareCardState = .loaded(artifact, source: .remote)
+                shareCardPreview = artifact
+            } catch is CancellationError {
+                return
+            } catch {
+                shareCardState = .failed(Self.errorMessage(for: error), previous: shareCardState.value)
+            }
+        }
+    }
+
+    private static func errorMessage(for error: Error) -> String {
+        if let apiError = error as? APIError {
+            return apiError.message
+        }
+
+        if let localizedError = error as? LocalizedError, let description = localizedError.errorDescription {
+            return description
+        }
+
+        return "The share card could not be prepared."
+    }
 }
 
 private enum CopyFeedback {
     case plain
     case citation
+}
+
+private struct ShareCardPreviewSheet: View {
+    let artifact: ShareCardArtifact
+
+    var body: some View {
+        FragmentaScreenBackground {
+            VStack(alignment: .leading, spacing: FragmentaSpacing.large) {
+                if let image = UIImage(contentsOfFile: artifact.fileURL.path) {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFit()
+                        .clipShape(RoundedRectangle(cornerRadius: FragmentaRadius.hero, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: FragmentaRadius.hero, style: .continuous)
+                                .stroke(Color.white.opacity(0.06), lineWidth: 1)
+                        )
+                } else {
+                    RoundedRectangle(cornerRadius: FragmentaRadius.hero, style: .continuous)
+                        .fill(FragmentaColor.surfaceOverlay)
+                        .frame(height: 260)
+                }
+
+                HStack(spacing: FragmentaSpacing.small) {
+                    ShareLink(item: artifact.fileURL) {
+                        Text("Share Card")
+                            .font(FragmentaTypography.metadata)
+                            .foregroundStyle(FragmentaColor.textPrimary)
+                            .chipSurfaceStyle()
+                    }
+
+                    Text(artifact.fileURL.lastPathComponent)
+                        .font(FragmentaTypography.caption)
+                        .foregroundStyle(FragmentaColor.textTertiary)
+                        .lineLimit(1)
+                }
+            }
+            .padding(FragmentaSpacing.large)
+        }
+    }
 }
 
 struct HighlightCardSkeletonView: View {

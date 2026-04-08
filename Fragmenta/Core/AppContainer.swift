@@ -7,7 +7,11 @@ struct AppContainer {
     let diagnosticsStore: DiagnosticsStore
     let sharedImportStore: SharedImportStore
     let booksService: BooksServiceProtocol
+    let insightsService: InsightsServiceProtocol
+    let collectionsService: CollectionsServiceProtocol
     let searchService: SearchServiceProtocol
+    let discoveryService: DiscoveryServiceProtocol
+    let shareCardService: ShareCardServiceProtocol
     let importService: ImportServiceProtocol
     let exportService: ExportServiceProtocol
 
@@ -34,9 +38,29 @@ struct AppContainer {
                 cacheStore: cacheStore,
                 diagnosticsStore: diagnosticsStore
             ),
+            insightsService: InsightsService(
+                apiClient: apiClient,
+                cacheStore: cacheStore,
+                diagnosticsStore: diagnosticsStore
+            ),
+            collectionsService: CollectionsService(
+                apiClient: apiClient,
+                cacheStore: cacheStore,
+                diagnosticsStore: diagnosticsStore
+            ),
             searchService: SearchService(
                 apiClient: apiClient,
+                cacheStore: cacheStore,
                 preferencesStore: preferencesStore,
+                diagnosticsStore: diagnosticsStore
+            ),
+            discoveryService: DiscoveryService(
+                apiClient: apiClient,
+                cacheStore: cacheStore,
+                diagnosticsStore: diagnosticsStore
+            ),
+            shareCardService: ShareCardService(
+                apiClient: apiClient,
                 diagnosticsStore: diagnosticsStore
             ),
             importService: ImportService(

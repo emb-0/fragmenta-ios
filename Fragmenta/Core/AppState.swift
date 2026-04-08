@@ -70,7 +70,7 @@ final class AppState: ObservableObject {
         container.diagnosticsStore.record(
             event: .cache,
             status: .success,
-            detail: "Cleared local cache store, cover cache, and pending shared import drafts."
+            detail: "Cleared cached library, discovery, insights, collections, cover art, search, and pending shared import drafts."
         )
     }
 
@@ -89,6 +89,7 @@ final class AppState: ObservableObject {
 
 enum RootTab: String, CaseIterable, Hashable, Identifiable {
     case library
+    case insights
     case search
     case importer
     case settings
@@ -99,6 +100,8 @@ enum RootTab: String, CaseIterable, Hashable, Identifiable {
         switch self {
         case .library:
             return "Library"
+        case .insights:
+            return "Insights"
         case .search:
             return "Search"
         case .importer:
@@ -112,6 +115,8 @@ enum RootTab: String, CaseIterable, Hashable, Identifiable {
         switch self {
         case .library:
             return "books.vertical"
+        case .insights:
+            return "chart.line.uptrend.xyaxis"
         case .search:
             return "magnifyingglass"
         case .importer:

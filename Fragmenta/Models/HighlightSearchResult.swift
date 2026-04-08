@@ -7,6 +7,8 @@ struct HighlightSearchResult: Codable, Identifiable, Hashable, Sendable {
     let snippet: String?
     let matchedInNote: Bool?
     let matchedField: String?
+    let matchReason: String?
+    let semanticScore: Double?
 
     var id: String {
         highlight.id

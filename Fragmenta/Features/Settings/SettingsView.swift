@@ -62,7 +62,7 @@ struct SettingsView: View {
                 .font(FragmentaTypography.sectionTitle)
                 .foregroundStyle(FragmentaColor.textPrimary)
 
-            Text("Fragmenta is the native reading artifact for Kindle exports parsed by fragmenta-core. Sprint 4 tightens the native ingest, export, and runtime-validation seams without changing the app’s core shape.")
+            Text("Fragmenta is the native reading artifact for Kindle exports parsed by fragmenta-core. Sprint 6 adds insights, collections, backend share cards, AI-backed discovery surfaces, and deeper cache resilience without shifting the app away from its calm reading focus.")
                 .font(FragmentaTypography.body)
                 .foregroundStyle(FragmentaColor.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -142,7 +142,11 @@ struct SettingsView: View {
                 .foregroundStyle(FragmentaColor.textPrimary)
 
             DiagnosticRow(title: "Library", event: viewModel.diagnostics.lastLibraryEvent)
+            DiagnosticRow(title: "Insights", event: viewModel.diagnostics.lastInsightsEvent)
+            DiagnosticRow(title: "Collections", event: viewModel.diagnostics.lastCollectionsEvent)
             DiagnosticRow(title: "Search", event: viewModel.diagnostics.lastSearchEvent)
+            DiagnosticRow(title: "Discovery", event: viewModel.diagnostics.lastDiscoveryEvent)
+            DiagnosticRow(title: "Share Cards", event: viewModel.diagnostics.lastShareCardEvent)
             DiagnosticRow(title: "Import Preview", event: viewModel.diagnostics.lastImportPreviewEvent)
             DiagnosticRow(title: "Import Commit", event: viewModel.diagnostics.lastImportCommitEvent)
             DiagnosticRow(title: "Exports", event: viewModel.diagnostics.lastExportEvent)
@@ -161,7 +165,7 @@ struct SettingsView: View {
                 .font(FragmentaTypography.sectionTitle)
                 .foregroundStyle(FragmentaColor.textPrimary)
 
-            Text(viewModel.cacheMessage ?? "Library snapshots, book detail payloads, cover thumbnails, import history, diagnostics, and recent searches are stored locally to keep the shell resilient.")
+            Text(viewModel.cacheMessage ?? "Library snapshots, book detail payloads, insights, collections, discovery summaries, cover thumbnails, import history, diagnostics, and recent searches are stored locally to keep the shell resilient.")
                 .font(FragmentaTypography.body)
                 .foregroundStyle(FragmentaColor.textSecondary)
 

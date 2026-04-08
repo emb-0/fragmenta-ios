@@ -54,6 +54,11 @@ final class SearchViewModel: ObservableObject {
         scheduleSearch(immediate: true)
     }
 
+    func setMode(_ mode: SearchQuery.Mode) {
+        query.mode = mode
+        scheduleSearch(immediate: true)
+    }
+
     func toggleNotesOnly() {
         query.hasNotesOnly.toggle()
         scheduleSearch(immediate: true)
@@ -123,10 +128,17 @@ final class SearchViewModel: ObservableObject {
     }
 
     private func performSearch() async {
+        let page = PageRequest(page: 1, limit: query.pageSize)
+        let cachedResults = await searchService.loadCachedSearchResults(query: query, page: page)
+        if let cachedResults {
+            state = .loading(previous: cachedResults.items)
+            pageInfo = cachedResults.pageInfo
+        }
+
         do {
             let response = try await searchService.searchHighlights(
                 query: query,
-                page: PageRequest(page: 1, limit: query.pageSize)
+                page: page
             )
             state = .loaded(response.items, source: .remote)
             pageInfo = response.pageInfo
@@ -135,7 +147,7 @@ final class SearchViewModel: ObservableObject {
             return
         } catch {
             let message = Self.errorMessage(for: error)
-            if let previousResults = state.value, previousResults.isEmpty == false {
+            if let previousResults = state.value ?? cachedResults?.items, previousResults.isEmpty == false {
                 state = .failed(message, previous: previousResults)
             } else {
                 state = .failed(message)

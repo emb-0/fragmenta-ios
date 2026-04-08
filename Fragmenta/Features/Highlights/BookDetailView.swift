@@ -19,14 +19,19 @@ struct BookDetailView: View {
 
     @EnvironmentObject private var appState: AppState
     @StateObject private var viewModel: BookDetailViewModel
+    @StateObject private var discoveryModel = BookDiscoverySectionModel()
     @State private var markdownExportState: LoadableState<ExportArtifact> = .idle
     @State private var highlightFilter: HighlightFilter = .all
+    @State private var isShowingCollectionsSheet = false
+
+    private let bookID: String
 
     init(
         bookID: String,
         focusHighlightID: String? = nil,
         booksService: BooksServiceProtocol
     ) {
+        self.bookID = bookID
         _viewModel = StateObject(
             wrappedValue: BookDetailViewModel(
                 bookID: bookID,
@@ -50,6 +55,10 @@ struct BookDetailView: View {
                 .scrollIndicators(.hidden)
                 .refreshable {
                     viewModel.refresh()
+                    discoveryModel.refresh(
+                        bookID: bookID,
+                        service: appState.container.discoveryService
+                    )
                 }
             }
             .navigationTitle("Book")
@@ -57,6 +66,10 @@ struct BookDetailView: View {
             .toolbarBackground(.hidden, for: .navigationBar)
             .task {
                 viewModel.loadIfNeeded()
+                discoveryModel.loadIfNeeded(
+                    bookID: bookID,
+                    service: appState.container.discoveryService
+                )
             }
             .onChange(of: viewModel.focusedHighlightID, initial: false) { _, focusedHighlightID in
                 guard let focusedHighlightID else {
@@ -65,6 +78,16 @@ struct BookDetailView: View {
 
                 withAnimation(.easeInOut(duration: 0.28)) {
                     proxy.scrollTo(focusedHighlightID, anchor: .center)
+                }
+            }
+            .sheet(isPresented: $isShowingCollectionsSheet) {
+                if let book = viewModel.detailState.value?.book {
+                    BookCollectionsSheet(
+                        book: book,
+                        collectionsService: appState.container.collectionsService
+                    )
+                    .presentationDetents([.medium, .large])
+                    .presentationDragIndicator(.visible)
                 }
             }
         }
@@ -99,9 +122,13 @@ struct BookDetailView: View {
                     )
 
                     BookDetailActionStrip(
+                        book: detail.book,
                         exportState: markdownExportState,
                         generateMarkdown: {
                             generateMarkdownExport(for: detail.book.id)
+                        },
+                        showCollections: {
+                            isShowingCollectionsSheet = true
                         }
                     )
                 }
@@ -113,6 +140,8 @@ struct BookDetailView: View {
                 if case .failed(let message, let previous) = viewModel.highlightsState, previous != nil {
                     DetailStatusCard(title: "Showing saved highlights", message: message)
                 }
+
+                discoverySection
 
                 VStack(alignment: .leading, spacing: FragmentaSpacing.large) {
                     VStack(alignment: .leading, spacing: FragmentaSpacing.xSmall) {
@@ -216,6 +245,31 @@ struct BookDetailView: View {
         }
 
         return nil
+    }
+
+    @ViewBuilder
+    private var discoverySection: some View {
+        let discovery = discoveryModel.state.value
+
+        if let discovery, discovery.isEmpty == false {
+            BookDiscoverySection(
+                discovery: discovery,
+                bookID: bookID,
+                booksService: appState.container.booksService,
+                focusHighlight: { highlightID in
+                    viewModel.focus(highlightID: highlightID)
+                }
+            )
+        } else if case .loading(let previous) = discoveryModel.state, previous != nil {
+            DetailStatusCard(
+                title: "Refreshing discovery",
+                message: "Updating the AI-assisted summary and related threads for this book."
+            )
+        } else if case .failed(let message, let previous) = discoveryModel.state, previous != nil {
+            DetailStatusCard(title: "Showing saved discovery", message: message)
+        } else if case .failed(let message, nil) = discoveryModel.state {
+            DetailStatusCard(title: "Discovery unavailable", message: message)
+        }
     }
 
     private func generateMarkdownExport(for bookID: String) {
@@ -429,8 +483,10 @@ private struct DetailStatusCard: View {
 }
 
 private struct BookDetailActionStrip: View {
+    let book: Book
     let exportState: LoadableState<ExportArtifact>
     let generateMarkdown: () -> Void
+    let showCollections: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: FragmentaSpacing.small) {
@@ -469,6 +525,11 @@ private struct BookDetailActionStrip: View {
                     .fragmentaAdaptiveGlassButton()
                 }
 
+                Button("Collections") {
+                    showCollections()
+                }
+                .fragmentaAdaptiveGlassButton()
+
                 Spacer(minLength: 0)
             }
 
@@ -486,8 +547,188 @@ private struct BookDetailActionStrip: View {
                     .font(FragmentaTypography.metadata)
                     .foregroundStyle(FragmentaColor.textSecondary)
             }
+
+            if book.noteCountLabel != nil || book.highlightCount > 0 {
+                HStack(spacing: FragmentaSpacing.small) {
+                    Text(book.highlightCountLabel)
+                        .font(FragmentaTypography.chip)
+                        .foregroundStyle(FragmentaColor.textTertiary)
+                        .chipSurfaceStyle()
+
+                    if let noteCountLabel = book.noteCountLabel {
+                        Text(noteCountLabel)
+                            .font(FragmentaTypography.chip)
+                            .foregroundStyle(FragmentaColor.textTertiary)
+                            .chipSurfaceStyle()
+                    }
+                }
+            }
         }
         .sectionSurfaceStyle()
+    }
+}
+
+@MainActor
+private final class BookDiscoverySectionModel: ObservableObject {
+    @Published private(set) var state: LoadableState<BookDiscovery> = .idle
+
+    private var loadTask: Task<Void, Never>?
+
+    deinit {
+        loadTask?.cancel()
+    }
+
+    func loadIfNeeded(bookID: String, service: DiscoveryServiceProtocol) {
+        if case .idle = state {
+            load(bookID: bookID, service: service)
+        }
+    }
+
+    func refresh(bookID: String, service: DiscoveryServiceProtocol) {
+        load(bookID: bookID, service: service)
+    }
+
+    private func load(bookID: String, service: DiscoveryServiceProtocol) {
+        loadTask?.cancel()
+        loadTask = Task { [weak self] in
+            await self?.performLoad(bookID: bookID, service: service)
+        }
+    }
+
+    private func performLoad(bookID: String, service: DiscoveryServiceProtocol) async {
+        let cachedDiscovery = await service.loadCachedBookDiscovery(bookID: bookID)
+        state = .loading(previous: state.value ?? cachedDiscovery)
+
+        do {
+            let discovery = try await service.fetchBookDiscovery(bookID: bookID)
+            state = .loaded(discovery, source: .remote)
+        } catch is CancellationError {
+            return
+        } catch {
+            let message = Self.errorMessage(for: error)
+            if let previous = state.value ?? cachedDiscovery {
+                state = .failed(message, previous: previous)
+            } else {
+                state = .failed(message)
+            }
+        }
+    }
+
+    private static func errorMessage(for error: Error) -> String {
+        if let apiError = error as? APIError {
+            return apiError.message
+        }
+
+        return "AI discovery is temporarily unavailable."
+    }
+}
+
+private struct BookDiscoverySection: View {
+    let discovery: BookDiscovery
+    let bookID: String
+    let booksService: BooksServiceProtocol
+    let focusHighlight: (String) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: FragmentaSpacing.large) {
+            VStack(alignment: .leading, spacing: FragmentaSpacing.xSmall) {
+                Text("Discovery")
+                    .font(FragmentaTypography.sectionTitle)
+                    .foregroundStyle(FragmentaColor.textPrimary)
+
+                Text("AI-backed summary and thematic echoes from fragmenta-core, kept small enough to support the reading surface rather than overwhelm it.")
+                    .font(FragmentaTypography.metadata)
+                    .foregroundStyle(FragmentaColor.textSecondary)
+            }
+
+            if let summary = discovery.summary, summary.isBlank == false {
+                Text(summary)
+                    .font(FragmentaTypography.body)
+                    .foregroundStyle(FragmentaColor.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .insetSurfaceStyle()
+            }
+
+            if discovery.themes.isEmpty == false {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: FragmentaSpacing.small) {
+                        ForEach(discovery.themes) { theme in
+                            Text(theme.title)
+                                .font(FragmentaTypography.chip)
+                                .foregroundStyle(FragmentaColor.textSecondary)
+                                .chipSurfaceStyle()
+                        }
+                    }
+                }
+            }
+
+            if discovery.relatedHighlights.isEmpty == false {
+                VStack(alignment: .leading, spacing: FragmentaSpacing.medium) {
+                    Text("Related highlights")
+                        .font(FragmentaTypography.metadata)
+                        .foregroundStyle(FragmentaColor.textSecondary)
+
+                    ForEach(discovery.relatedHighlights.prefix(4)) { relatedHighlight in
+                        if relatedHighlight.highlight.bookID == bookID {
+                            Button {
+                                focusHighlight(relatedHighlight.highlight.id)
+                            } label: {
+                                RelatedHighlightRow(relatedHighlight: relatedHighlight)
+                            }
+                            .buttonStyle(.plain)
+                        } else {
+                            NavigationLink {
+                                BookDetailView(
+                                    bookID: relatedHighlight.highlight.bookID,
+                                    focusHighlightID: relatedHighlight.highlight.id,
+                                    booksService: booksService
+                                )
+                            } label: {
+                                RelatedHighlightRow(relatedHighlight: relatedHighlight)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+            }
+        }
+        .sectionSurfaceStyle()
+    }
+}
+
+private struct RelatedHighlightRow: View {
+    let relatedHighlight: BookDiscovery.RelatedHighlight
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: FragmentaSpacing.small) {
+            if let reason = relatedHighlight.reason, reason.isBlank == false {
+                Text(reason)
+                    .font(FragmentaTypography.caption)
+                    .foregroundStyle(FragmentaColor.accentSoft)
+            }
+
+            Text(relatedHighlight.highlight.text.trimmed)
+                .font(FragmentaTypography.narrative)
+                .foregroundStyle(FragmentaColor.textPrimary)
+                .lineLimit(4)
+
+            HStack(spacing: FragmentaSpacing.small) {
+                if let book = relatedHighlight.book {
+                    Text(book.title)
+                        .font(FragmentaTypography.metadata)
+                        .foregroundStyle(FragmentaColor.textSecondary)
+                        .lineLimit(1)
+                }
+
+                if let locationLabel = relatedHighlight.highlight.locationLabel {
+                    Text(locationLabel)
+                        .font(FragmentaTypography.chip)
+                        .foregroundStyle(FragmentaColor.textTertiary)
+                        .chipSurfaceStyle()
+                }
+            }
+        }
+        .insetSurfaceStyle()
     }
 }
 

@@ -43,9 +43,10 @@ Sprint 6 also ends on:
 - upstream: `origin/main`
 - remote: `git@github.com:emb-0/fragmenta-ios.git`
 - push target: `origin main`
-- pushed Sprint 6 head: `99c0957`
+- pushed Sprint 6 head: `5f55455`
 - Sprint 6 feature commit: `3c4c1f5`
 - Sprint 6 handoff commit: `99c0957`
+- Sprint 6 push-state commit: `5f55455`
 
 ## Important tree changes
 

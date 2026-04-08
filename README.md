@@ -10,161 +10,176 @@ This repository is intentionally:
 - not Expo
 - not a cross-platform scaffold
 
-Sprint 4 is a tight runtime-readiness sprint. It builds on the polished Sprint 3 shell and focuses on the native behaviors that matter most when the app first meets Xcode and real device workflows: direct file ingest, share-sheet handoff structure, citation-aware actions, book-level export hooks, and cleaner diagnostics.
+Sprint 5 is a tight runtime-quality sprint. It keeps Sprint 4’s ingest and share foundations, then pushes the library toward a real native product surface with cover-rich browsing, image caching, faster perceived navigation, and better runtime readiness for tonight’s Xcode pass.
 
-## Sprint 4 snapshot
+## Sprint 5 snapshot
 
-Sprint 4 adds:
+Sprint 5 adds:
 
-- app-level incoming file handling through `onOpenURL`
-- document-type registration for plain-text Kindle exports
-- a shared import-draft pipeline used by Files open-in-place, document picker ingest, and future share-extension handoff
-- a real share-extension scaffold that stages shared text or files into an app-group-backed pending import draft
-- stronger import preview, warnings, duplicate, and result presentation
-- citation-aware highlight copy/share actions
-- book-level markdown export hooks in Book Detail
-- better load-more recovery on the reading screen
-- sharper search result snippet emphasis and retry behavior
-- more useful Settings diagnostics for backend, app group, and last import state
+- a real cover-based bookshelf mode alongside the existing journal/list shelf
+- remembered library view mode preference
+- backend-cover enrichment decoding without introducing any direct Google Books client on iOS
+- a dedicated native cover image pipeline with downsampling, memory caching, URL caching, and prefetching
+- cover-aware list cards and a stronger cover-rich book detail header
+- a tighter reading screen with a notes-only highlight filter
+- small runtime-speed improvements for search and cover prefetching
+- clearer local cache messaging for cover art and shelf data
 
 ## Git state audit
 
-Sprint 4 started by verifying repository state before any feature work.
+Sprint 5 started by verifying repository state before feature work.
 
-Initial audit found:
+Verified at the start:
 
 - `git status --short --branch` showed `main...origin/main`
 - `git branch -vv` showed `main` tracking `origin/main`
 - `git remote -v` showed `origin` as `git@github.com:emb-0/fragmenta-ios.git`
-- there were no pending local changes before Sprint 4 work began
+- `git log --oneline --decorate -6` showed the Sprint 4 commits on `main`
+- there were no pending local changes before Sprint 5 work began
 
-Sprint 4 ends by committing the new work and pushing `main` back to the same remote.
-
-Current expected repo state after Sprint 4:
+Sprint 5 ends the same way:
 
 - branch: `main`
 - upstream: `origin/main`
 - remote: `git@github.com:emb-0/fragmenta-ios.git`
-- push status: Sprint 4 commits pushed to GitHub on `main`
+- push target: `origin main`
 
 ## Important tree changes
 
 ```text
 fragmenta-ios/
-├── Config/
-│   ├── Base.xcconfig
-│   ├── Fragmenta.entitlements
-│   ├── FragmentaShareExtension.entitlements
-│   ├── Info.plist
-│   └── ShareExtension-Info.plist
 ├── Fragmenta/
-│   ├── App/
 │   ├── Core/
-│   │   └── ImportIntake/
+│   │   └── Images/
 │   ├── Features/
 │   │   ├── Highlights/
-│   │   ├── Import/
-│   │   ├── Search/
-│   │   └── Settings/
+│   │   └── Library/
 │   ├── Models/
-│   ├── Services/
 │   └── Utilities/
-├── FragmentaShareExtension/
-│   └── ShareViewController.swift
+├── Config/
 ├── Fragmenta.xcodeproj
-├── project.yml
 └── README.md
 ```
 
-Key new Sprint 4 files:
+Key Sprint 5 additions:
 
-- `Fragmenta/Core/ImportIntake/IncomingImportDraft.swift`
-- `Fragmenta/Core/ImportIntake/TextImportLoader.swift`
-- `Fragmenta/Core/ImportIntake/SharedImportStore.swift`
-- `FragmentaShareExtension/ShareViewController.swift`
-- `Config/Fragmenta.entitlements`
-- `Config/FragmentaShareExtension.entitlements`
-- `Config/ShareExtension-Info.plist`
+- `Fragmenta/Core/Images/CoverImagePipeline.swift`
+- `Fragmenta/Features/Library/BookCoverArtView.swift`
+- `Fragmenta/Features/Library/LibraryViewMode.swift`
 
-## Sprint 4 implementation notes
+Key Sprint 5 updates:
 
-### Runtime readiness
+- `Fragmenta/Models/Book.swift`
+- `Fragmenta/Features/Library/LibraryView.swift`
+- `Fragmenta/Features/Library/LibraryViewModel.swift`
+- `Fragmenta/Features/Library/BookShelfCardView.swift`
+- `Fragmenta/Features/Highlights/BookDetailView.swift`
+- `Fragmenta/Features/Highlights/BookDetailViewModel.swift`
+- `Fragmenta/Core/AppPreferencesStore.swift`
+- `Fragmenta/Core/AppState.swift`
 
-- `AppState` now owns pending incoming import drafts and incoming file error messaging.
-- `FragmentaApp` refreshes pending shared drafts on launch and when the scene becomes active.
-- `Info.plist` now declares plain-text document support and opening-in-place support.
-- version defaults were advanced to Sprint 4 values:
-  - `MARKETING_VERSION = 0.4.0`
-  - `CURRENT_PROJECT_VERSION = 4`
+## Sprint 5 implementation notes
 
-### Native ingest
+### Bookshelf view
 
-- Files-based `.txt` ingest still uses `UIDocumentPicker`, but now routes through a shared `TextImportLoader`.
-- direct open-from-Files is scaffolded through `onOpenURL`
-- pending shared import drafts can be written into an app group and then picked up inside the app
-- the Import screen now understands incoming drafts from:
-  - pasted text
-  - document picker
-  - Files app
-  - share extension
+The library now supports two modes:
 
-### Share extension
+- `Journal`
+- `Bookshelf`
 
-Sprint 4 includes a real share-extension scaffold:
+`Journal` preserves the existing text-forward editorial shelf.
 
-- target declared in `project.yml`
-- `ShareViewController` extracts shared text or file URLs
-- the extension stores a pending import draft into the configured app group
-- the main app reads that draft and routes the user to Import for preview/commit
+`Bookshelf` adds:
 
-This still needs Xcode/device validation, but the project structure, plist, entitlements, source files, and handoff path are now in place.
+- cover-led browsing in a lazy grid
+- a smaller “Front shelf” strip for recent or prominent books
+- premium fallback covers when no remote cover exists
+- smooth tap-through into the existing book detail flow
 
-### Export, copy, and share
+The preferred view mode is persisted locally through `AppPreferencesStore`.
 
-- `ExportService` now supports:
-  - library-wide export
-  - book-level export via `book_id`
-- Book Detail now exposes a book-level markdown export/share affordance
-- highlight cards now support:
-  - plain copy
-  - copy with citation
-  - share with citation
-- search results now offer copy actions from a context menu
+### Backend cover enrichment assumptions
 
-### Reading and search polish
+Fragmenta iOS does not call Google Books or any other third-party enrichment provider directly.
 
-- Book Detail now has load-more retry handling
-- long quotes and notes are explicitly text-selectable
-- search results now emphasize matched terms inside the snippet
-- search failures now offer a retry path
+All enrichment is assumed to be backend-owned by `fragmenta-core`.
 
-### Settings and diagnostics
+The client now tolerates multiple backend cover shapes, including:
 
-- Settings now displays:
-  - active backend URL
-  - default backend URL
-  - configured app group identifier
-  - cached last import response
-- cache clearing now also clears pending shared import drafts
+- nested `cover` objects
+- nested `enrichment.cover` objects
+- top-level fields such as:
+  - `cover_url`
+  - `cover_thumbnail_url`
+  - `cover_large_url`
+  - `cover_background_hex`
+  - `cover_foreground_hex`
+  - `cover_width`
+  - `cover_height`
+
+This keeps the iOS client flexible if `fragmenta-core` adjusts its enrichment payload slightly.
+
+### Cover image loading and caching
+
+Sprint 5 adds a dedicated image pipeline instead of leaning on default `AsyncImage` behavior.
+
+The cover stack now uses:
+
+- `NSCache` for in-memory cover reuse
+- `URLCache` through a dedicated `URLSession` for HTTP response caching
+- image downsampling before view rendering
+- request de-duplication for in-flight image fetches
+- eager prefetching of the most visible library covers
+
+The goal is pragmatic runtime smoothness:
+
+- less janky scrolling
+- less re-decoding while browsing
+- more stable covers in repeated navigation
+
+### Library runtime polish
+
+Sprint 5 keeps the library tight:
+
+- fast view-mode switching
+- cover prefetching for the first visible shelf items
+- no extra metadata client or duplicate enrichment pipeline
+- preserved journal mode for users who want a text-first shelf
+
+### Reading and detail polish
+
+The book detail screen now supports:
+
+- a cover-led hero when art is available
+- the same fallback cover language when it is not
+- a local `All Highlights` / `With Notes` filter
+- preserved copy/share/export actions from Sprint 4
+- a smoother first impression when book detail cover art is available
+
+### Search and settings refinements
+
+Sprint 5 includes a few small runtime wins:
+
+- slightly faster search debounce
+- clearer Settings messaging that cover art is part of the local cache
+- cache clearing now reflects the broader runtime state more honestly
 
 ## Local persistence
 
-Fragmenta now uses two lightweight persistence layers:
+Fragmenta now uses these lightweight persistence layers:
 
-- `Caches/FragmentaCache` for library, book detail, import history, and import/export payload caching
-- `UserDefaults` for recent searches, diagnostics, and debug base URL override
+- `Caches/FragmentaCache` for library, book detail, import, and export payload caching
+- `UserDefaults` for recent searches, diagnostics, debug base URL override, and preferred library view mode
+- app-group-backed pending import draft storage for share-extension handoff
+- in-memory cover cache plus URL-backed cover response cache for artwork
 
-Sprint 4 adds a third small persistence seam for native handoff:
-
-- app-group-backed pending import draft storage for share-extension to main-app handoff
-
-This is still intentionally not a full offline sync engine.
+This remains intentionally lightweight. Sprint 5 is not an offline sync engine.
 
 ## Backend assumptions
 
-Fragmenta still assumes a public backend with no auth in Sprint 4.
+Fragmenta still assumes a public backend with no auth in Sprint 5.
 
-Expected endpoints:
+Expected endpoints still include:
 
 - `GET /api/books`
 - `GET /api/books/{id}`
@@ -178,10 +193,11 @@ Expected endpoints:
 - `GET /api/exports/markdown`
 - `GET /api/exports/csv`
 
-Sprint 4 also assumes book-level export can be represented cleanly as:
+Additional Sprint 5 assumptions:
 
-- `GET /api/exports/markdown?book_id={id}`
-- `GET /api/exports/csv?book_id={id}` if needed later
+- book payloads may now include backend-owned enrichment or cover metadata
+- thumbnail and larger cover URLs may both be present
+- the best bookshelf image may differ from the best detail image
 
 Transport assumptions remain:
 
@@ -189,11 +205,12 @@ Transport assumptions remain:
 - errors use an `error` object or string
 - payloads are `snake_case`
 - dates are ISO8601 strings
-- pagination payloads may vary slightly, so the client remains tolerant
 
 ## Config values
 
-Set these before running in Xcode:
+No new required config values were added in Sprint 5.
+
+You still need to set:
 
 - `FRAGMENTA_API_BASE_URL`
 - `FRAGMENTA_APP_GROUP_IDENTIFIER`
@@ -206,8 +223,8 @@ Current defaults in `Config/Base.xcconfig`:
 - `PRODUCT_BUNDLE_IDENTIFIER = com.fragmenta.ios`
 - `FRAGMENTA_SHARE_EXTENSION_BUNDLE_IDENTIFIER = com.fragmenta.ios.share`
 - `FRAGMENTA_APP_GROUP_IDENTIFIER = group.com.fragmenta.shared`
-- `MARKETING_VERSION = 0.4.0`
-- `CURRENT_PROJECT_VERSION = 4`
+- `MARKETING_VERSION = 0.5.0`
+- `CURRENT_PROJECT_VERSION = 5`
 
 Environment notes:
 
@@ -216,69 +233,76 @@ Environment notes:
 
 `127.0.0.1` is correct for an iOS simulator on the same Mac. It is not correct for a physical device.
 
-## Exact Xcode validation steps
+## Exact Xcode validation steps for tonight
 
-When you return to Xcode:
+When you get back to Xcode:
 
 1. Open `/Users/emmettbell/claude/Code/fragmenta-ios`.
 2. Run `xcodegen generate` if you want to regenerate from `project.yml`.
 3. Open `Fragmenta.xcodeproj`.
-4. Set your signing team for both:
+4. Set signing for:
    - `Fragmenta`
    - `FragmentaShareExtension`
-5. Confirm or replace:
+5. Confirm:
    - `PRODUCT_BUNDLE_IDENTIFIER`
    - `FRAGMENTA_SHARE_EXTENSION_BUNDLE_IDENTIFIER`
-6. Set `FRAGMENTA_API_BASE_URL`.
-7. Add the App Groups capability to both targets and use the same `FRAGMENTA_APP_GROUP_IDENTIFIER`.
-8. Build the app target first.
-9. Validate these flows in order:
+   - `FRAGMENTA_API_BASE_URL`
+   - `FRAGMENTA_APP_GROUP_IDENTIFIER`
+6. Ensure the App Groups capability is applied to both targets with the same group identifier.
+7. Build the app target first.
+8. Validate these flows in order:
    - launch and initial library load
-   - book detail pagination
+   - switch between `Journal` and `Bookshelf` modes
+   - bookshelf scrolling with many books
+   - cover loading, reuse, and fallback behavior
+   - navigation from both library modes into book detail
+   - book detail with and without cover art
+   - notes-only highlight filter in book detail
    - search tap-through into focused highlight context
    - import via pasted text
    - import via document picker
    - opening a `.txt` file into Fragmenta from Files
    - book markdown export/share
-   - share extension handoff from shared text or a shared `.txt` file
+   - share-extension handoff from shared text or a shared `.txt` file
 
 ## Validation completed here
 
 Completed in this environment:
 
-- git audit of local branch, upstream, and remote
-- Sprint 4 source changes
+- git audit of local branch, upstream, remote, and recent commits
+- Sprint 5 source changes
 - `xcodegen generate`
 - `plutil -lint Config/Info.plist`
 - `plutil -lint Config/ShareExtension-Info.plist`
 - `plutil -lint` for both entitlements files
+- `git diff --check`
 
 Not completed here:
 
 - compiling against the iOS SDK in Xcode
 - simulator execution
 - device execution
-- App Groups capability setup in Xcode
-- share-extension runtime validation
-- document-open runtime validation from Files
-- share/export runtime validation through the real system share sheet
+- runtime verification of the new cover pipeline
+- performance validation with a large real book set
+- direct Files/share-extension ingest validation on-device
 
 This machine still does not have Xcode installed, so those checks remain real follow-up work.
 
-## What still needs real device or runtime verification
+## What still needs real runtime or device verification
 
-- first compile across the new app target and share-extension target
-- whether the configured app group resolves correctly under your signing setup
+- first compile across the app target and share-extension target
+- real-world cover loading behavior with backend-provided enrichment payloads
+- scroll smoothness in bookshelf mode with a larger library
+- cover cache reuse after navigating in and out of detail repeatedly
 - direct `.txt` open from Files into Fragmenta
-- share-extension handoff from Files, Notes, Safari, or Kindle-adjacent sources
-- share sheet presentation for book markdown export
-- clipboard/haptics behavior on device
-- pagination feel with larger real highlight datasets
+- share-extension handoff from other apps
+- share sheet presentation for exports
+- final spacing and behavior on real iPhone hardware
 
-## Sprint 5 recommendations
+## Sprint 6 recommendations
 
-- validate and harden the share extension on real devices
-- add targeted tests around import-draft decoding and handoff state
-- refine export destinations and sharing UX once runtime behavior is confirmed
-- tighten any compile/runtime issues discovered during the first real Xcode pass
-- consider richer reading affordances only after the ingest/share loop is fully validated
+- validate and harden the cover payload contract against the real backend
+- refine bookshelf mode once real device performance is measured
+- add targeted tests around cover decoding and library view-mode persistence
+- tune any remaining SwiftUI/runtime issues discovered during the first full Xcode pass
+- only expand product scope again after the real runtime validation loop is stable

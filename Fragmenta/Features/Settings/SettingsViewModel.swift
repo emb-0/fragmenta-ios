@@ -6,21 +6,28 @@ final class SettingsViewModel: ObservableObject {
     @Published private(set) var diagnostics = DiagnosticsSnapshot.empty
     @Published private(set) var exportStates: [ExportFormat: LoadableState<ExportArtifact>] = [:]
     @Published private(set) var lastImportResponse: ImportResponse?
+    @Published private(set) var backendHealthCheck: BackendHealthCheck?
+    @Published private(set) var isCheckingBackend = false
     @Published var baseURLOverrideDraft: String
+    @Published private(set) var baseURLOverrideMessage: String?
+    @Published private(set) var baseURLOverrideIsError = false
     @Published private(set) var cacheMessage: String?
 
     private let exportService: ExportServiceProtocol
     private let importService: ImportServiceProtocol
+    private let backendDiagnosticsService: BackendDiagnosticsServiceProtocol
     private let diagnosticsStore: DiagnosticsStore
 
     init(
         exportService: ExportServiceProtocol,
         importService: ImportServiceProtocol,
+        backendDiagnosticsService: BackendDiagnosticsServiceProtocol,
         diagnosticsStore: DiagnosticsStore,
         baseURLOverride: String
     ) {
         self.exportService = exportService
         self.importService = importService
+        self.backendDiagnosticsService = backendDiagnosticsService
         self.diagnosticsStore = diagnosticsStore
         self.baseURLOverrideDraft = baseURLOverride
     }
@@ -34,6 +41,10 @@ final class SettingsViewModel: ObservableObject {
             }
 
             lastImportResponse = await importService.loadCachedLastImportResponse()
+
+            if backendHealthCheck == nil {
+                await performBackendHealthCheck()
+            }
         }
     }
 
@@ -46,13 +57,34 @@ final class SettingsViewModel: ObservableObject {
     }
 
     func applyBaseURLOverride(using appState: AppState) {
-        appState.applyDevelopmentBaseURLOverride(baseURLOverrideDraft)
-        baseURLOverrideDraft = appState.developmentBaseURLOverride
+        switch appState.applyDevelopmentBaseURLOverride(baseURLOverrideDraft) {
+        case .applied(let resolvedURL):
+            baseURLOverrideDraft = appState.developmentBaseURLOverride
+            baseURLOverrideMessage = "Applied development override: \(resolvedURL)"
+            baseURLOverrideIsError = false
+        case .cleared:
+            baseURLOverrideDraft = appState.developmentBaseURLOverride
+            baseURLOverrideMessage = "Cleared the development override. Fragmenta is back on the bundled base URL."
+            baseURLOverrideIsError = false
+        case .rejected(let message):
+            baseURLOverrideMessage = message
+            baseURLOverrideIsError = true
+            return
+        }
+
+        backendHealthCheck = nil
+        load()
     }
 
     func clearCache(using appState: AppState) {
         Task { [weak self] in
             await self?.performClearCache(using: appState)
+        }
+    }
+
+    func runBackendHealthCheck() {
+        Task { [weak self] in
+            await self?.performBackendHealthCheck()
         }
     }
 
@@ -88,5 +120,13 @@ final class SettingsViewModel: ObservableObject {
         } catch {
             cacheMessage = Self.errorMessage(for: error)
         }
+    }
+
+    private func performBackendHealthCheck() async {
+        isCheckingBackend = true
+        defer { isCheckingBackend = false }
+
+        backendHealthCheck = await backendDiagnosticsService.checkBackend()
+        diagnostics = diagnosticsStore.snapshot()
     }
 }

@@ -53,6 +53,7 @@ struct RootView: View {
                     config: container.config,
                     exportService: container.exportService,
                     importService: container.importService,
+                    backendDiagnosticsService: container.backendDiagnosticsService,
                     diagnosticsStore: container.diagnosticsStore
                 )
             }
@@ -63,10 +64,7 @@ struct RootView: View {
         }
         .tint(FragmentaColor.textPrimary)
         .animation(.spring(response: 0.32, dampingFraction: 0.88), value: appState.selectedTab)
-        .toolbarColorScheme(.dark, for: .tabBar)
-        .toolbarBackground(.visible, for: .tabBar)
-        .toolbarBackground(FragmentaColor.backgroundElevated.opacity(0.94), for: .tabBar)
-        .fragmentaTabBarMinimization()
+        .fragmentaTabBarChrome()
     }
 }
 

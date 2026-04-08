@@ -6,6 +6,7 @@ struct AppContainer {
     let preferencesStore: AppPreferencesStore
     let diagnosticsStore: DiagnosticsStore
     let sharedImportStore: SharedImportStore
+    let backendDiagnosticsService: BackendDiagnosticsServiceProtocol
     let booksService: BooksServiceProtocol
     let insightsService: InsightsServiceProtocol
     let collectionsService: CollectionsServiceProtocol
@@ -26,6 +27,11 @@ struct AppContainer {
             config: config,
             headersProvider: PublicRequestHeadersProvider()
         )
+        let backendDiagnosticsService = BackendDiagnosticsService(
+            config: config,
+            apiClient: apiClient,
+            diagnosticsStore: diagnosticsStore
+        )
 
         return AppContainer(
             config: config,
@@ -33,6 +39,7 @@ struct AppContainer {
             preferencesStore: preferencesStore,
             diagnosticsStore: diagnosticsStore,
             sharedImportStore: sharedImportStore,
+            backendDiagnosticsService: backendDiagnosticsService,
             booksService: BooksService(
                 apiClient: apiClient,
                 cacheStore: cacheStore,

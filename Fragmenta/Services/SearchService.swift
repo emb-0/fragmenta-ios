@@ -46,17 +46,19 @@ struct SearchService: SearchServiceProtocol {
         }
 
         do {
-            let response: PaginatedResponse<HighlightSearchResult> = try await apiClient.request(.search(query: query, page: page))
-            try await cacheStore.save(response, forKey: CacheKey.results(query: query, page: page))
+            let remotePage = remotePageRequest(for: query, page: page)
+            let response: PaginatedResponse<HighlightSearchResult> = try await apiClient.request(.search(query: query, page: remotePage))
+            let refinedResponse = applyLocalRefinements(to: response, query: query, requestedPage: page, remotePage: remotePage)
+            try await cacheStore.save(refinedResponse, forKey: CacheKey.results(query: query, page: page))
             if trimmedQuery.isEmpty == false {
                 preferencesStore.saveRecentSearch(trimmedQuery)
             }
             diagnosticsStore.record(
                 event: .search,
                 status: .success,
-                detail: Self.diagnosticsMessage(for: query, resultCount: response.items.count)
+                detail: Self.diagnosticsMessage(for: query, resultCount: refinedResponse.items.count)
             )
-            return response
+            return refinedResponse
         } catch is CancellationError {
             throw CancellationError()
         } catch {
@@ -93,6 +95,63 @@ struct SearchService: SearchServiceProtocol {
         }
 
         return "\(modeDescriptor.capitalized)filtered search returned \(resultCount) results."
+    }
+
+    private func remotePageRequest(for query: SearchQuery, page: PageRequest) -> PageRequest {
+        if requiresLocalRefinement(for: query) {
+            return PageRequest(page: 1, limit: max(page.limit, 80))
+        }
+
+        return page
+    }
+
+    private func applyLocalRefinements(
+        to response: PaginatedResponse<HighlightSearchResult>,
+        query: SearchQuery,
+        requestedPage: PageRequest,
+        remotePage: PageRequest
+    ) -> PaginatedResponse<HighlightSearchResult> {
+        var results = response.items
+
+        if query.author.isBlank == false {
+            let authorFilter = query.author.trimmed
+            results = results.filter {
+                ($0.book.author ?? "").localizedCaseInsensitiveContains(authorFilter)
+            }
+        }
+
+        switch query.sort {
+        case .oldest:
+            results.sort {
+                chronologicalRank(for: $0.highlight) < chronologicalRank(for: $1.highlight)
+            }
+        case .newest:
+            results.sort {
+                chronologicalRank(for: $0.highlight) > chronologicalRank(for: $1.highlight)
+            }
+        case .relevance:
+            break
+        }
+
+        if remotePage != requestedPage {
+            return PaginatedResponse(
+                items: results,
+                pageInfo: PageInfo.singlePage(itemCount: results.count, limit: max(results.count, requestedPage.limit))
+            )
+        }
+
+        return PaginatedResponse(items: results, pageInfo: response.pageInfo)
+    }
+
+    private func requiresLocalRefinement(for query: SearchQuery) -> Bool {
+        query.author.isBlank == false || query.sort == .oldest
+    }
+
+    private func chronologicalRank(for highlight: Highlight) -> Date {
+        highlight.highlightedAt
+            ?? highlight.createdAt
+            ?? highlight.updatedAt
+            ?? .distantPast
     }
 }
 

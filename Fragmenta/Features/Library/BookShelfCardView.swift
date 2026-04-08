@@ -5,9 +5,9 @@ struct BookShelfCardView: View {
     var emphasized = false
 
     var body: some View {
-        let cardContent = HStack(alignment: .top, spacing: FragmentaSpacing.large) {
+        let cardContent = HStack(alignment: .top, spacing: FragmentaSpacing.medium) {
             BookCoverArtView(book: book, presentation: .list)
-                .frame(width: 82, height: emphasized ? 132 : 118)
+                .frame(width: 92, height: emphasized ? 138 : 124)
 
             VStack(alignment: .leading, spacing: FragmentaSpacing.medium) {
                 HStack(alignment: .top, spacing: FragmentaSpacing.small) {
@@ -98,10 +98,10 @@ struct BookShelfCardView: View {
 
 struct BookShelfCardSkeletonView: View {
     var body: some View {
-        HStack(alignment: .top, spacing: FragmentaSpacing.large) {
+        HStack(alignment: .top, spacing: FragmentaSpacing.medium) {
             RoundedRectangle(cornerRadius: FragmentaRadius.medium, style: .continuous)
                 .fill(FragmentaColor.surfaceOverlay)
-                .frame(width: 82, height: 118)
+                .frame(width: 92, height: 124)
 
             VStack(alignment: .leading, spacing: FragmentaSpacing.medium) {
                 RoundedRectangle(cornerRadius: 6, style: .continuous)

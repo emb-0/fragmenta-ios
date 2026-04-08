@@ -67,7 +67,15 @@ extension APIEndpoint where Response == Highlight {
 
 extension APIEndpoint where Response == PaginatedResponse<HighlightSearchResult> {
     static func search(query: SearchQuery, page: PageRequest) -> APIEndpoint<PaginatedResponse<HighlightSearchResult>> {
-        APIEndpoint(
+        let serverSort: String
+        switch query.sort {
+        case .relevance:
+            serverSort = "relevance"
+        case .newest, .oldest:
+            serverSort = "recent"
+        }
+
+        return APIEndpoint(
             path: "/api/search",
             queryItems: [
                 URLQueryItem(name: "q", value: query.trimmedText),
@@ -75,7 +83,7 @@ extension APIEndpoint where Response == PaginatedResponse<HighlightSearchResult>
                 URLQueryItem(name: "author", value: query.author.isBlank ? nil : query.author.trimmed),
                 URLQueryItem(name: "has_notes", value: query.hasNotesOnly ? "true" : nil),
                 URLQueryItem(name: "mode", value: query.mode == .semantic ? query.mode.rawValue : nil),
-                URLQueryItem(name: "sort", value: query.sort.rawValue),
+                URLQueryItem(name: "sort", value: serverSort),
                 URLQueryItem(name: "limit", value: "\(page.limit)"),
                 URLQueryItem(name: "offset", value: "\(max(page.page - 1, 0) * page.limit)")
             ].compactMap { $0.value == nil ? nil : $0 }

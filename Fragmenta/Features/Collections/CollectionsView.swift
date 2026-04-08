@@ -321,21 +321,19 @@ private struct CollectionDetailHero: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: FragmentaSpacing.large) {
-            HStack(alignment: .top, spacing: FragmentaSpacing.large) {
-                CollectionPreviewStack(books: Array(detail.books.prefix(3)))
-                    .frame(width: 104)
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .top, spacing: FragmentaSpacing.large) {
+                    CollectionPreviewStack(books: Array(detail.books.prefix(3)))
+                        .frame(width: 112)
 
-                VStack(alignment: .leading, spacing: FragmentaSpacing.small) {
-                    Text(detail.title)
-                        .font(FragmentaTypography.heroDisplay)
-                        .foregroundStyle(FragmentaColor.textPrimary)
+                    heroCopy
+                }
 
-                    if let summary = detail.summary, summary.isBlank == false {
-                        Text(summary)
-                            .font(FragmentaTypography.body)
-                            .foregroundStyle(FragmentaColor.textSecondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
+                VStack(alignment: .leading, spacing: FragmentaSpacing.medium) {
+                    CollectionPreviewStack(books: Array(detail.books.prefix(3)))
+                        .frame(width: 124)
+
+                    heroCopy
                 }
             }
 
@@ -365,6 +363,22 @@ private struct CollectionDetailHero: View {
             }
         }
         .journalCardStyle()
+    }
+
+    private var heroCopy: some View {
+        VStack(alignment: .leading, spacing: FragmentaSpacing.small) {
+            Text(detail.title)
+                .font(FragmentaTypography.heroDisplay)
+                .foregroundStyle(FragmentaColor.textPrimary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            if let summary = detail.summary, summary.isBlank == false {
+                Text(summary)
+                    .font(FragmentaTypography.body)
+                    .foregroundStyle(FragmentaColor.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
     }
 
     private func detailMetric(_ value: String, label: String) -> some View {

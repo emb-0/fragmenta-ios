@@ -206,49 +206,51 @@ private struct SearchFilterCard: View {
                 }
             }
 
-            HStack(spacing: FragmentaSpacing.small) {
-                Menu {
-                    ForEach(SearchQuery.Sort.allCases) { sort in
-                        Button(sort.title) {
-                            viewModel.setSort(sort)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: FragmentaSpacing.small) {
+                    Menu {
+                        ForEach(SearchQuery.Sort.allCases) { sort in
+                            Button(sort.title) {
+                                viewModel.setSort(sort)
+                            }
                         }
+                    } label: {
+                        HStack(spacing: FragmentaSpacing.xSmall) {
+                            Text("Sort")
+                            Text(viewModel.query.sort.title)
+                        }
+                        .font(FragmentaTypography.metadata)
+                        .foregroundStyle(FragmentaColor.textSecondary)
+                        .chipSurfaceStyle()
                     }
-                } label: {
-                    HStack(spacing: FragmentaSpacing.xSmall) {
-                        Text("Sort")
-                        Text(viewModel.query.sort.title)
+
+                    Menu {
+                        Button("All books") {
+                            viewModel.selectBook(nil)
+                        }
+
+                        ForEach(viewModel.availableBooks) { book in
+                            Button(book.title) {
+                                viewModel.selectBook(book)
+                            }
+                        }
+                    } label: {
+                        HStack(spacing: FragmentaSpacing.xSmall) {
+                            Text("Book")
+                            Text(selectedBookTitle)
+                        }
+                        .font(FragmentaTypography.metadata)
+                        .foregroundStyle(FragmentaColor.textSecondary)
+                        .chipSurfaceStyle()
+                    }
+
+                    Button(viewModel.query.hasNotesOnly ? "Notes Only" : "Any Notes") {
+                        viewModel.toggleNotesOnly()
                     }
                     .font(FragmentaTypography.metadata)
-                    .foregroundStyle(FragmentaColor.textSecondary)
+                    .foregroundStyle(viewModel.query.hasNotesOnly ? FragmentaColor.textPrimary : FragmentaColor.textSecondary)
                     .chipSurfaceStyle()
                 }
-
-                Menu {
-                    Button("All books") {
-                        viewModel.selectBook(nil)
-                    }
-
-                    ForEach(viewModel.availableBooks) { book in
-                        Button(book.title) {
-                            viewModel.selectBook(book)
-                        }
-                    }
-                } label: {
-                    HStack(spacing: FragmentaSpacing.xSmall) {
-                        Text("Book")
-                        Text(selectedBookTitle)
-                    }
-                    .font(FragmentaTypography.metadata)
-                    .foregroundStyle(FragmentaColor.textSecondary)
-                    .chipSurfaceStyle()
-                }
-
-                Button(viewModel.query.hasNotesOnly ? "Notes Only" : "Any Notes") {
-                    viewModel.toggleNotesOnly()
-                }
-                .font(FragmentaTypography.metadata)
-                .foregroundStyle(viewModel.query.hasNotesOnly ? FragmentaColor.textPrimary : FragmentaColor.textSecondary)
-                .chipSurfaceStyle()
             }
 
             TextField(

@@ -147,6 +147,33 @@ struct FragmentaTabBarMinimizationModifier: ViewModifier {
     }
 }
 
+struct FragmentaTabBarChromeModifier: ViewModifier {
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+#if compiler(>=6.2)
+        if #available(iOS 26.0, *), reduceTransparency == false {
+            content
+                .toolbarColorScheme(.dark, for: .tabBar)
+                .toolbarBackground(.hidden, for: .tabBar)
+                .tabBarMinimizeBehavior(.onScrollDown)
+        } else {
+            fallback(content)
+        }
+#else
+        fallback(content)
+#endif
+    }
+
+    private func fallback(_ content: Content) -> some View {
+        content
+            .toolbarColorScheme(.dark, for: .tabBar)
+            .toolbarBackground(.visible, for: .tabBar)
+            .toolbarBackground(FragmentaColor.backgroundElevated.opacity(0.88), for: .tabBar)
+    }
+}
+
 extension View {
     func fragmentaAdaptiveGlassButton(prominent: Bool = false, shape: ButtonBorderShape = .capsule) -> some View {
         modifier(FragmentaAdaptiveGlassButtonModifier(prominent: prominent, shape: shape))
@@ -174,6 +201,10 @@ extension View {
 
     func fragmentaTabBarMinimization() -> some View {
         modifier(FragmentaTabBarMinimizationModifier())
+    }
+
+    func fragmentaTabBarChrome() -> some View {
+        modifier(FragmentaTabBarChromeModifier())
     }
 }
 

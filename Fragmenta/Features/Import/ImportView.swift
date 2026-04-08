@@ -35,7 +35,7 @@ struct ImportView: View {
                 }
                 .padding(.horizontal, FragmentaSpacing.large)
                 .padding(.top, FragmentaSpacing.large)
-                .padding(.bottom, 132)
+                .padding(.bottom, FragmentaSpacing.xxxLarge)
             }
             .scrollIndicators(.hidden)
         }
@@ -74,37 +74,13 @@ struct ImportView: View {
                 .font(FragmentaTypography.sectionTitle)
                 .foregroundStyle(FragmentaColor.textPrimary)
 
-            HStack(spacing: FragmentaSpacing.small) {
-                ForEach(ImportViewModel.SourceMode.allCases) { sourceMode in
-                    Button {
-                        viewModel.selectSourceMode(sourceMode)
-                    } label: {
-                        VStack(alignment: .leading, spacing: FragmentaSpacing.xSmall) {
-                            Image(systemName: iconName(for: sourceMode))
-                                .font(.system(size: 18, weight: .semibold, design: .rounded))
-                                .foregroundStyle(viewModel.sourceMode == sourceMode ? FragmentaColor.textPrimary : FragmentaColor.textTertiary)
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: FragmentaSpacing.small) {
+                    sourceModeButtons
+                }
 
-                            Text(sourceMode.title)
-                                .font(FragmentaTypography.bodyEmphasized)
-                                .foregroundStyle(viewModel.sourceMode == sourceMode ? FragmentaColor.textPrimary : FragmentaColor.textSecondary)
-
-                            Text(sourceMode == .paste ? "Paste a raw export directly." : "Read a `.txt` file from Files.")
-                                .font(FragmentaTypography.metadata)
-                                .foregroundStyle(FragmentaColor.textTertiary)
-                                .multilineTextAlignment(.leading)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(FragmentaSpacing.medium)
-                        .background(
-                            RoundedRectangle(cornerRadius: FragmentaRadius.medium, style: .continuous)
-                                .fill(viewModel.sourceMode == sourceMode ? FragmentaColor.surfaceQuaternary.opacity(0.75) : FragmentaColor.surfaceTertiary.opacity(0.58))
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: FragmentaRadius.medium, style: .continuous)
-                                        .stroke(viewModel.sourceMode == sourceMode ? FragmentaColor.accent.opacity(0.22) : Color.white.opacity(0.04), lineWidth: 1)
-                                )
-                        )
-                    }
-                    .buttonStyle(.plain)
+                VStack(spacing: FragmentaSpacing.small) {
+                    sourceModeButtons
                 }
             }
         }
@@ -262,35 +238,22 @@ struct ImportView: View {
     }
 
     private var actionBar: some View {
-        HStack(spacing: FragmentaSpacing.medium) {
-            if viewModel.sourceMode == .file {
-                Button("Choose File") {
-                    viewModel.presentDocumentPicker()
-                }
-                .fragmentaAdaptiveGlassButton()
-            } else {
-                Button("Clear") {
-                    viewModel.reset()
-                }
-                .fragmentaAdaptiveGlassButton()
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: FragmentaSpacing.medium) {
+                secondaryActionButton
+                primaryActionButton
             }
 
-            Button(primaryActionTitle) {
-                switch viewModel.workflowState {
-                case .previewReady:
-                    viewModel.confirmImport()
-                default:
-                    viewModel.previewImport()
-                }
+            VStack(spacing: FragmentaSpacing.small) {
+                primaryActionButton
+                secondaryActionButton
             }
-            .disabled(primaryActionDisabled)
-            .fragmentaAdaptiveGlassButton(prominent: true)
         }
         .padding(.horizontal, FragmentaSpacing.small)
         .padding(.vertical, FragmentaSpacing.small)
         .floatingBarStyle()
         .padding(.horizontal, FragmentaSpacing.large)
-        .padding(.bottom, FragmentaSpacing.small)
+        .padding(.bottom, FragmentaSpacing.xSmall)
         .background(Color.clear)
     }
 
@@ -370,6 +333,68 @@ struct ImportView: View {
         viewModel.applyIncomingDraft(pendingDraft)
         lastAppliedIncomingDraftID = pendingDraft.id
         appState.consumePendingIncomingImportDraft()
+    }
+
+    private var sourceModeButtons: some View {
+        ForEach(ImportViewModel.SourceMode.allCases) { sourceMode in
+            Button {
+                viewModel.selectSourceMode(sourceMode)
+            } label: {
+                VStack(alignment: .leading, spacing: FragmentaSpacing.xSmall) {
+                    Image(systemName: iconName(for: sourceMode))
+                        .font(.system(size: 18, weight: .semibold, design: .rounded))
+                        .foregroundStyle(viewModel.sourceMode == sourceMode ? FragmentaColor.textPrimary : FragmentaColor.textTertiary)
+
+                    Text(sourceMode.title)
+                        .font(FragmentaTypography.bodyEmphasized)
+                        .foregroundStyle(viewModel.sourceMode == sourceMode ? FragmentaColor.textPrimary : FragmentaColor.textSecondary)
+
+                    Text(sourceMode == .paste ? "Paste a raw export directly." : "Read a `.txt` file from Files.")
+                        .font(FragmentaTypography.metadata)
+                        .foregroundStyle(FragmentaColor.textTertiary)
+                        .multilineTextAlignment(.leading)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(FragmentaSpacing.medium)
+                .background(
+                    RoundedRectangle(cornerRadius: FragmentaRadius.medium, style: .continuous)
+                        .fill(viewModel.sourceMode == sourceMode ? FragmentaColor.surfaceQuaternary.opacity(0.75) : FragmentaColor.surfaceTertiary.opacity(0.58))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: FragmentaRadius.medium, style: .continuous)
+                                .stroke(viewModel.sourceMode == sourceMode ? FragmentaColor.accent.opacity(0.22) : Color.white.opacity(0.04), lineWidth: 1)
+                        )
+                )
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private var secondaryActionButton: some View {
+        Group {
+            if viewModel.sourceMode == .file {
+                Button("Choose File") {
+                    viewModel.presentDocumentPicker()
+                }
+            } else {
+                Button("Clear") {
+                    viewModel.reset()
+                }
+            }
+        }
+        .fragmentaAdaptiveGlassButton()
+    }
+
+    private var primaryActionButton: some View {
+        Button(primaryActionTitle) {
+            switch viewModel.workflowState {
+            case .previewReady:
+                viewModel.confirmImport()
+            default:
+                viewModel.previewImport()
+            }
+        }
+        .disabled(primaryActionDisabled)
+        .fragmentaAdaptiveGlassButton(prominent: true)
     }
 }
 

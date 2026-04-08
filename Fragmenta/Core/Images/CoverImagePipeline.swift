@@ -10,8 +10,7 @@ final class CoverImagePipeline: @unchecked Sendable {
 
     private let session: URLSession
     private let memoryCache = NSCache<NSString, UIImage>()
-    private let lock = NSLock()
-    private var inFlightTasks: [NSString: Task<UIImage, Error>] = [:]
+    private let registry = CoverImageTaskRegistry()
 
     init(session: URLSession? = nil) {
         if let session {
@@ -40,14 +39,9 @@ final class CoverImagePipeline: @unchecked Sendable {
             return cached
         }
 
-        let task: Task<UIImage, Error>
-        lock.lock()
-        if let existingTask = inFlightTasks[cacheKey] {
-            task = existingTask
-            lock.unlock()
-        } else {
-            let session = self.session
-            task = Task(priority: .utility) {
+        let session = self.session
+        let task = await registry.task(for: cacheKey) {
+            Task(priority: .utility) {
                 var request = URLRequest(url: url)
                 request.cachePolicy = .returnCacheDataElseLoad
 
@@ -65,21 +59,15 @@ final class CoverImagePipeline: @unchecked Sendable {
 
                 return image
             }
-            inFlightTasks[cacheKey] = task
-            lock.unlock()
         }
 
         do {
             let image = try await task.value
             memoryCache.setObject(image, forKey: cacheKey, cost: image.fragmentaCacheCost)
-            lock.lock()
-            inFlightTasks[cacheKey] = nil
-            lock.unlock()
+            await registry.removeTask(for: cacheKey)
             return image
         } catch {
-            lock.lock()
-            inFlightTasks[cacheKey] = nil
-            lock.unlock()
+            await registry.removeTask(for: cacheKey)
             throw error
         }
     }
@@ -101,13 +89,10 @@ final class CoverImagePipeline: @unchecked Sendable {
     func clear() {
         memoryCache.removeAllObjects()
         session.configuration.urlCache?.removeAllCachedResponses()
-
-        lock.lock()
-        let tasks = inFlightTasks.values
-        inFlightTasks.removeAll()
-        lock.unlock()
-
-        tasks.forEach { $0.cancel() }
+        Task {
+            let tasks = await registry.removeAllTasks()
+            tasks.forEach { $0.cancel() }
+        }
     }
 
     private static func downsampledImage(from data: Data, maxPixelSize: CGFloat) -> UIImage? {
@@ -128,6 +113,33 @@ final class CoverImagePipeline: @unchecked Sendable {
         }
 
         return UIImage(cgImage: image)
+    }
+}
+
+private actor CoverImageTaskRegistry {
+    private var inFlightTasks: [NSString: Task<UIImage, Error>] = [:]
+
+    func task(
+        for key: NSString,
+        create: @Sendable () -> Task<UIImage, Error>
+    ) -> Task<UIImage, Error> {
+        if let existingTask = inFlightTasks[key] {
+            return existingTask
+        }
+
+        let task = create()
+        inFlightTasks[key] = task
+        return task
+    }
+
+    func removeTask(for key: NSString) {
+        inFlightTasks[key] = nil
+    }
+
+    func removeAllTasks() -> [Task<UIImage, Error>] {
+        let tasks = Array(inFlightTasks.values)
+        inFlightTasks.removeAll()
+        return tasks
     }
 }
 

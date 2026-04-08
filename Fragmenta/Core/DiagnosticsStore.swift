@@ -1,6 +1,7 @@
 import Foundation
 
 enum DiagnosticEventKind: String, Codable, Hashable, Sendable {
+    case backend
     case library
     case insights
     case collections
@@ -26,6 +27,7 @@ struct DiagnosticEvent: Codable, Hashable, Sendable {
 }
 
 struct DiagnosticsSnapshot: Codable, Hashable, Sendable {
+    var lastBackendEvent: DiagnosticEvent?
     var lastLibraryEvent: DiagnosticEvent?
     var lastInsightsEvent: DiagnosticEvent?
     var lastCollectionsEvent: DiagnosticEvent?
@@ -83,6 +85,8 @@ final class DiagnosticsStore {
         let event = DiagnosticEvent(kind: kind, status: status, detail: detail, recordedAt: .now)
 
         switch kind {
+        case .backend:
+            snapshot.lastBackendEvent = event
         case .library:
             snapshot.lastLibraryEvent = event
         case .insights:

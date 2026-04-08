@@ -138,6 +138,19 @@ struct PreviewImportService: ImportServiceProtocol {
     }
 }
 
+struct PreviewBackendDiagnosticsService: BackendDiagnosticsServiceProtocol {
+    func checkBackend() async -> BackendHealthCheck {
+        BackendHealthCheck(
+            status: .reachableWithoutHealthEndpoint,
+            summary: "Preview backend reachable via stats fallback.",
+            detail: "The preview container simulates a backend that responds to /api/stats/overview but does not implement /api/health yet.",
+            checkedAt: .now,
+            primaryPath: "/api/health",
+            fallbackPath: "/api/stats/overview"
+        )
+    }
+}
+
 struct PreviewExportService: ExportServiceProtocol {
     func exportLibrary(format: ExportFormat) async throws -> ExportArtifact {
         PreviewFixtures.exportArtifact
@@ -152,6 +165,11 @@ extension AppConfig {
     static let preview = AppConfig(
         apiBaseURL: URL(string: "https://preview.fragmenta.local")!,
         defaultAPIBaseURL: URL(string: "https://preview.fragmenta.local")!,
+        apiBaseURLSource: .bundledDefault,
+        rawDefaultAPIBaseURL: "https://preview.fragmenta.local",
+        rawDevelopmentBaseURLOverride: nil,
+        baseURLConfigurationIssue: nil,
+        isUsingFallbackAPIBaseURL: false,
         requestTimeout: 20,
         appDisplayName: "Fragmenta",
         appVersion: "0.6.0",
@@ -167,6 +185,7 @@ extension AppContainer {
         preferencesStore: AppPreferencesStore(),
         diagnosticsStore: DiagnosticsStore(),
         sharedImportStore: SharedImportStore(appGroupIdentifier: AppConfig.preview.appGroupIdentifier),
+        backendDiagnosticsService: PreviewBackendDiagnosticsService(),
         booksService: PreviewBooksService(),
         insightsService: PreviewInsightsService(),
         collectionsService: PreviewCollectionsService(),

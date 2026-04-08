@@ -89,6 +89,10 @@ final class APIClient {
         headers: [String: String],
         body: AnyEncodable?
     ) async throws -> (data: Data, response: HTTPURLResponse) {
+        if config.isUsingFallbackAPIBaseURL, let issue = config.baseURLConfigurationIssue {
+            throw APIError.invalidBaseURL(config.rawDevelopmentBaseURLOverride ?? config.rawDefaultAPIBaseURL, issue: issue)
+        }
+
         guard
             var components = URLComponents(
                 url: resolvedURL(for: path),
@@ -126,7 +130,7 @@ final class APIClient {
         } catch is CancellationError {
             throw CancellationError()
         } catch {
-            throw mapTransportError(error)
+            throw mapTransportError(error, requestURL: url)
         }
 
         guard let httpResponse = response as? HTTPURLResponse else {
@@ -139,13 +143,13 @@ final class APIClient {
         return (data, httpResponse)
     }
 
-    private func mapTransportError(_ error: Error) -> APIError {
+    private func mapTransportError(_ error: Error, requestURL: URL) -> APIError {
         if let urlError = error as? URLError {
             switch urlError.code {
             case .cancelled:
                 return .cancelled()
             case .notConnectedToInternet, .networkConnectionLost, .cannotConnectToHost, .cannotFindHost, .timedOut:
-                return .offline(urlError)
+                return .offline(urlError, requestURL: requestURL)
             default:
                 return .transport(statusCode: urlError.errorCode, message: urlError.localizedDescription)
             }

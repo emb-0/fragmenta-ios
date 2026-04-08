@@ -10,6 +10,7 @@ struct SettingsView: View {
         config: AppConfig,
         exportService: ExportServiceProtocol,
         importService: ImportServiceProtocol,
+        backendDiagnosticsService: BackendDiagnosticsServiceProtocol,
         diagnosticsStore: DiagnosticsStore
     ) {
         self.config = config
@@ -17,6 +18,7 @@ struct SettingsView: View {
             wrappedValue: SettingsViewModel(
                 exportService: exportService,
                 importService: importService,
+                backendDiagnosticsService: backendDiagnosticsService,
                 diagnosticsStore: diagnosticsStore,
                 baseURLOverride: ""
             )
@@ -62,7 +64,7 @@ struct SettingsView: View {
                 .font(FragmentaTypography.sectionTitle)
                 .foregroundStyle(FragmentaColor.textPrimary)
 
-            Text("Fragmenta is the native reading artifact for Kindle exports parsed by fragmenta-core. Sprint 7 tightens config, backend compatibility, share-ingest readiness, and compile stability so this Mac can focus on real validation instead of setup churn.")
+            Text("Fragmenta is the native reading artifact for Kindle exports parsed by fragmenta-core. Sprint 8 tightens phone ergonomics, backend reachability, diagnostics, and runtime behavior so the app feels native on real devices instead of just compiling cleanly.")
                 .font(FragmentaTypography.body)
                 .foregroundStyle(FragmentaColor.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -82,13 +84,31 @@ struct SettingsView: View {
                 .font(FragmentaTypography.sectionTitle)
                 .foregroundStyle(FragmentaColor.textPrimary)
 
-            Text("Fragmenta currently speaks to a public fragmenta-core API without auth. Debug builds can override the base URL locally for simulator, device, or production validation.")
+            Text("Fragmenta currently speaks to fragmenta-core without auth. This section shows the resolved base URL, where it came from, and whether the app can actually reach the backend from the current runtime.")
                 .font(FragmentaTypography.body)
                 .foregroundStyle(FragmentaColor.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
 
-            LabeledSettingRow(label: "Active", value: config.apiBaseURL.absoluteString, monospaced: true)
+            if let issue = config.baseURLConfigurationIssue {
+                SettingsStatusCard(
+                    title: "Base URL issue",
+                    message: issue,
+                    emphasis: .negative
+                )
+            }
+
+            LabeledSettingRow(label: "Resolved", value: config.apiBaseURL.absoluteString, monospaced: true)
             LabeledSettingRow(label: "Default", value: config.defaultAPIBaseURL.absoluteString, monospaced: true)
+            LabeledSettingRow(label: "Source", value: config.apiBaseURLSource.title)
             LabeledSettingRow(label: "App Group", value: config.appGroupIdentifier ?? "Not configured", monospaced: true)
+            LabeledSettingRow(label: "Reachability note", value: config.baseURLConnectivityGuidance)
+
+            backendHealthStatus
+
+            Button("Run Backend Check") {
+                viewModel.runBackendHealthCheck()
+            }
+            .fragmentaAdaptiveGlassButton(prominent: true)
 
 #if DEBUG
             VStack(alignment: .leading, spacing: FragmentaSpacing.small) {
@@ -102,10 +122,40 @@ struct SettingsView: View {
                     .autocorrectionDisabled()
                     .fieldSurfaceStyle()
 
-                Button("Apply Override") {
-                    viewModel.applyBaseURLOverride(using: appState)
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: FragmentaSpacing.small) {
+                        Button("Apply Override") {
+                            viewModel.applyBaseURLOverride(using: appState)
+                        }
+                        .fragmentaAdaptiveGlassButton(prominent: true)
+
+                        Button("Clear Override") {
+                            viewModel.baseURLOverrideDraft = ""
+                            viewModel.applyBaseURLOverride(using: appState)
+                        }
+                        .fragmentaAdaptiveGlassButton()
+                    }
+
+                    VStack(alignment: .leading, spacing: FragmentaSpacing.small) {
+                        Button("Apply Override") {
+                            viewModel.applyBaseURLOverride(using: appState)
+                        }
+                        .fragmentaAdaptiveGlassButton(prominent: true)
+
+                        Button("Clear Override") {
+                            viewModel.baseURLOverrideDraft = ""
+                            viewModel.applyBaseURLOverride(using: appState)
+                        }
+                        .fragmentaAdaptiveGlassButton()
+                    }
                 }
-                .fragmentaAdaptiveGlassButton(prominent: true)
+
+                if let baseURLOverrideMessage = viewModel.baseURLOverrideMessage {
+                    Text(baseURLOverrideMessage)
+                        .font(FragmentaTypography.metadata)
+                        .foregroundStyle(viewModel.baseURLOverrideIsError ? FragmentaColor.negative : FragmentaColor.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
 #endif
         }
@@ -141,6 +191,7 @@ struct SettingsView: View {
                 .font(FragmentaTypography.sectionTitle)
                 .foregroundStyle(FragmentaColor.textPrimary)
 
+            DiagnosticRow(title: "Backend", event: viewModel.diagnostics.lastBackendEvent)
             DiagnosticRow(title: "Library", event: viewModel.diagnostics.lastLibraryEvent)
             DiagnosticRow(title: "Insights", event: viewModel.diagnostics.lastInsightsEvent)
             DiagnosticRow(title: "Collections", event: viewModel.diagnostics.lastCollectionsEvent)
@@ -175,6 +226,28 @@ struct SettingsView: View {
             .fragmentaAdaptiveGlassButton()
         }
         .sectionSurfaceStyle()
+    }
+
+    @ViewBuilder
+    private var backendHealthStatus: some View {
+        if viewModel.isCheckingBackend {
+            HStack(spacing: FragmentaSpacing.small) {
+                ProgressView()
+                    .tint(FragmentaColor.textPrimary)
+                Text("Checking backend reachability…")
+                    .font(FragmentaTypography.metadata)
+                    .foregroundStyle(FragmentaColor.textSecondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .insetSurfaceStyle()
+        } else if let backendHealthCheck = viewModel.backendHealthCheck {
+            BackendHealthStatusCard(check: backendHealthCheck)
+        } else {
+            SettingsStatusCard(
+                title: "Backend check",
+                message: "Run the backend check to verify whether this device can reach fragmenta-core from the currently resolved base URL."
+            )
+        }
     }
 }
 
@@ -220,6 +293,33 @@ private struct LabeledSettingRow: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .insetSurfaceStyle()
+    }
+}
+
+private struct BackendHealthStatusCard: View {
+    let check: BackendHealthCheck
+
+    var body: some View {
+        SettingsStatusCard(
+            title: check.status.title,
+            message: check.summary,
+            detail: detail
+        )
+    }
+
+    private var detail: String? {
+        let pathNote: String
+        if let fallbackPath = check.fallbackPath {
+            pathNote = "Checked \(check.primaryPath), then \(fallbackPath)."
+        } else {
+            pathNote = "Checked \(check.primaryPath)."
+        }
+
+        if let detail = check.detail, detail.isBlank == false {
+            return pathNote + " " + detail
+        }
+
+        return pathNote
     }
 }
 
@@ -292,6 +392,41 @@ private struct ExportRow: View {
     }
 }
 
+private struct SettingsStatusCard: View {
+    enum Emphasis {
+        case standard
+        case negative
+    }
+
+    let title: String
+    let message: String
+    var detail: String? = nil
+    var emphasis: Emphasis = .standard
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: FragmentaSpacing.xSmall) {
+            Text(title.uppercased())
+                .font(FragmentaTypography.eyebrow)
+                .foregroundStyle(emphasis == .negative ? FragmentaColor.negative : FragmentaColor.textTertiary)
+                .tracking(1.2)
+
+            Text(message)
+                .font(FragmentaTypography.body)
+                .foregroundStyle(FragmentaColor.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            if let detail, detail.isBlank == false {
+                Text(detail)
+                    .font(FragmentaTypography.metadata)
+                    .foregroundStyle(FragmentaColor.textTertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .insetSurfaceStyle()
+    }
+}
+
 private struct DiagnosticRow: View {
     let title: String
     let event: DiagnosticEvent?
@@ -330,6 +465,7 @@ struct SettingsView_Previews: PreviewProvider {
                 config: .preview,
                 exportService: PreviewExportService(),
                 importService: PreviewImportService(),
+                backendDiagnosticsService: PreviewBackendDiagnosticsService(),
                 diagnosticsStore: DiagnosticsStore()
             )
             .environmentObject(AppState(container: .preview))

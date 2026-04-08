@@ -308,62 +308,76 @@ private struct BookDetailHeroView: View {
     let isShowingFocusedContext: Bool
 
     var body: some View {
-        HStack(alignment: .top, spacing: FragmentaSpacing.large) {
-            BookCoverArtView(book: detail.book, presentation: .hero)
-                .frame(width: 110)
-                .aspectRatio(CGFloat(detail.book.resolvedCoverAspectRatio), contentMode: .fit)
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .top, spacing: FragmentaSpacing.large) {
+                heroCover(width: 116)
+                heroCopy
+            }
 
             VStack(alignment: .leading, spacing: FragmentaSpacing.large) {
-                HStack(alignment: .top, spacing: FragmentaSpacing.medium) {
-                    VStack(alignment: .leading, spacing: FragmentaSpacing.small) {
-                        if isShowingFocusedContext {
-                            Text("SEARCH CONTEXT")
-                                .font(FragmentaTypography.eyebrow)
-                                .foregroundStyle(FragmentaColor.accentSoft)
-                                .tracking(1.3)
-                        }
-
-                        Text(detail.book.title)
-                            .font(FragmentaTypography.heroDisplay)
-                            .foregroundStyle(FragmentaColor.textPrimary)
-                            .fixedSize(horizontal: false, vertical: true)
-
-                        Text(detail.book.displayAuthor)
-                            .font(FragmentaTypography.subheadline)
-                            .foregroundStyle(FragmentaColor.textSecondary)
-                    }
-
-                    Spacer(minLength: FragmentaSpacing.medium)
-
-                    VStack(alignment: .trailing, spacing: FragmentaSpacing.small) {
-                        chip(detail.book.source.rawValue.replacingOccurrences(of: "_", with: " ").capitalized)
-
-                        if let lastImportedAt = detail.stats.lastImportedAt {
-                            chip(lastImportedAt.fragmentaDayMonthYearString())
-                        }
-                    }
-                }
-
-                if let synopsis = detail.book.synopsis, synopsis.isBlank == false {
-                    Text(synopsis)
-                        .font(FragmentaTypography.body)
-                        .foregroundStyle(FragmentaColor.textSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-
-                HStack(spacing: FragmentaSpacing.medium) {
-                    metric(value: "\(detail.stats.highlightCount)", label: "highlights")
-                    metric(value: "\(detail.stats.noteCount)", label: "notes")
-
-                    if let firstHighlightAt = detail.stats.firstHighlightAt {
-                        metric(value: firstHighlightAt.fragmentaDayMonthYearString(), label: "first saved")
-                    } else if let latestHighlightAt = detail.stats.latestHighlightAt {
-                        metric(value: latestHighlightAt.fragmentaDayMonthYearString(), label: "last saved")
-                    }
-                }
+                heroCover(width: 132)
+                heroCopy
             }
         }
         .modifier(BookDetailHeroSurface(isShowingFocusedContext: isShowingFocusedContext))
+    }
+
+    private var heroCopy: some View {
+        VStack(alignment: .leading, spacing: FragmentaSpacing.large) {
+            HStack(alignment: .top, spacing: FragmentaSpacing.medium) {
+                VStack(alignment: .leading, spacing: FragmentaSpacing.small) {
+                    if isShowingFocusedContext {
+                        Text("SEARCH CONTEXT")
+                            .font(FragmentaTypography.eyebrow)
+                            .foregroundStyle(FragmentaColor.accentSoft)
+                            .tracking(1.3)
+                    }
+
+                    Text(detail.book.title)
+                        .font(FragmentaTypography.heroDisplay)
+                        .foregroundStyle(FragmentaColor.textPrimary)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    Text(detail.book.displayAuthor)
+                        .font(FragmentaTypography.subheadline)
+                        .foregroundStyle(FragmentaColor.textSecondary)
+                }
+
+                Spacer(minLength: FragmentaSpacing.medium)
+
+                VStack(alignment: .trailing, spacing: FragmentaSpacing.small) {
+                    chip(detail.book.source.rawValue.replacingOccurrences(of: "_", with: " ").capitalized)
+
+                    if let lastImportedAt = detail.stats.lastImportedAt {
+                        chip(lastImportedAt.fragmentaDayMonthYearString())
+                    }
+                }
+            }
+
+            if let synopsis = detail.book.synopsis, synopsis.isBlank == false {
+                Text(synopsis)
+                    .font(FragmentaTypography.body)
+                    .foregroundStyle(FragmentaColor.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            HStack(spacing: FragmentaSpacing.medium) {
+                metric(value: "\(detail.stats.highlightCount)", label: "highlights")
+                metric(value: "\(detail.stats.noteCount)", label: "notes")
+
+                if let firstHighlightAt = detail.stats.firstHighlightAt {
+                    metric(value: firstHighlightAt.fragmentaDayMonthYearString(), label: "first saved")
+                } else if let latestHighlightAt = detail.stats.latestHighlightAt {
+                    metric(value: latestHighlightAt.fragmentaDayMonthYearString(), label: "last saved")
+                }
+            }
+        }
+    }
+
+    private func heroCover(width: CGFloat) -> some View {
+        BookCoverArtView(book: detail.book, presentation: .hero)
+            .frame(width: width)
+            .aspectRatio(CGFloat(detail.book.resolvedCoverAspectRatio), contentMode: .fit)
     }
 
     private func chip(_ text: String) -> some View {
@@ -495,42 +509,26 @@ private struct BookDetailActionStrip: View {
                 .foregroundStyle(FragmentaColor.textTertiary)
                 .tracking(1.2)
 
-            HStack(spacing: FragmentaSpacing.small) {
-                switch exportState {
-                case .idle, .failed:
-                    Button("Export Markdown") {
-                        generateMarkdown()
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: FragmentaSpacing.small) {
+                    exportControls
+
+                    Button("Collections") {
+                        showCollections()
                     }
                     .fragmentaAdaptiveGlassButton()
-                case .loading:
-                    HStack(spacing: FragmentaSpacing.small) {
-                        ProgressView()
-                            .tint(FragmentaColor.textPrimary)
-                        Text("Preparing Markdown")
-                            .font(FragmentaTypography.metadata)
-                            .foregroundStyle(FragmentaColor.textSecondary)
-                    }
-                    .chipSurfaceStyle()
-                case .loaded(let artifact, _):
-                    ShareLink(item: artifact.fileURL) {
-                        Text("Share Markdown")
-                            .font(FragmentaTypography.metadata)
-                            .foregroundStyle(FragmentaColor.textPrimary)
-                            .chipSurfaceStyle()
-                    }
 
-                    Button("Refresh Export") {
-                        generateMarkdown()
+                    Spacer(minLength: 0)
+                }
+
+                VStack(alignment: .leading, spacing: FragmentaSpacing.small) {
+                    exportControls
+
+                    Button("Collections") {
+                        showCollections()
                     }
                     .fragmentaAdaptiveGlassButton()
                 }
-
-                Button("Collections") {
-                    showCollections()
-                }
-                .fragmentaAdaptiveGlassButton()
-
-                Spacer(minLength: 0)
             }
 
             switch exportState {
@@ -565,6 +563,38 @@ private struct BookDetailActionStrip: View {
             }
         }
         .sectionSurfaceStyle()
+    }
+
+    @ViewBuilder
+    private var exportControls: some View {
+        switch exportState {
+        case .idle, .failed:
+            Button("Export Markdown") {
+                generateMarkdown()
+            }
+            .fragmentaAdaptiveGlassButton()
+        case .loading:
+            HStack(spacing: FragmentaSpacing.small) {
+                ProgressView()
+                    .tint(FragmentaColor.textPrimary)
+                Text("Preparing Markdown")
+                    .font(FragmentaTypography.metadata)
+                    .foregroundStyle(FragmentaColor.textSecondary)
+            }
+            .chipSurfaceStyle()
+        case .loaded(let artifact, _):
+            ShareLink(item: artifact.fileURL) {
+                Text("Share Markdown")
+                    .font(FragmentaTypography.metadata)
+                    .foregroundStyle(FragmentaColor.textPrimary)
+                    .chipSurfaceStyle()
+            }
+
+            Button("Refresh Export") {
+                generateMarkdown()
+            }
+            .fragmentaAdaptiveGlassButton()
+        }
     }
 }
 

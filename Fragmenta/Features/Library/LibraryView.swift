@@ -147,7 +147,7 @@ struct LibraryView: View {
                         HStack(alignment: .top, spacing: FragmentaSpacing.large) {
                             ForEach(frontShelfBooks) { book in
                                 navigationTile(for: book, emphasis: .featured)
-                                    .frame(width: 164)
+                                    .frame(width: 176)
                             }
                         }
                         .padding(.vertical, FragmentaSpacing.small)
@@ -162,9 +162,9 @@ struct LibraryView: View {
                 )
 
                 LazyVGrid(
-                    columns: [GridItem(.adaptive(minimum: 132, maximum: 170), spacing: FragmentaSpacing.large)],
+                    columns: [GridItem(.adaptive(minimum: 148, maximum: 190), spacing: FragmentaSpacing.medium)],
                     alignment: .leading,
-                    spacing: FragmentaSpacing.xLarge
+                    spacing: FragmentaSpacing.large
                 ) {
                     ForEach(displayedBooks) { book in
                         navigationTile(for: book, emphasis: .standard)
@@ -462,7 +462,11 @@ private struct LibrarySummaryView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: FragmentaSpacing.medium) {
-            HStack(spacing: FragmentaSpacing.medium) {
+            LazyVGrid(
+                columns: [GridItem(.adaptive(minimum: 94), spacing: FragmentaSpacing.medium)],
+                alignment: .leading,
+                spacing: FragmentaSpacing.medium
+            ) {
                 summaryCard(value: "\(books.count)", label: books.count == 1 ? "book" : "books")
                 summaryCard(value: "\(totalHighlights)", label: totalHighlights == 1 ? "highlight" : "highlights")
                 summaryCard(value: "\(totalNotes)", label: totalNotes == 1 ? "note" : "notes")
@@ -575,10 +579,10 @@ private struct LibrarySummarySkeletonView: View {
 }
 
 private struct BookshelfGridSkeletonView: View {
-    private let columns = [GridItem(.adaptive(minimum: 132, maximum: 170), spacing: FragmentaSpacing.large)]
+    private let columns = [GridItem(.adaptive(minimum: 148, maximum: 190), spacing: FragmentaSpacing.medium)]
 
     var body: some View {
-        LazyVGrid(columns: columns, alignment: .leading, spacing: FragmentaSpacing.xLarge) {
+        LazyVGrid(columns: columns, alignment: .leading, spacing: FragmentaSpacing.large) {
             ForEach(0 ..< 6, id: \.self) { _ in
                 VStack(alignment: .leading, spacing: FragmentaSpacing.small) {
                     RoundedRectangle(cornerRadius: FragmentaRadius.large, style: .continuous)

@@ -3,6 +3,12 @@ import Foundation
 
 @MainActor
 final class AppState: ObservableObject {
+    enum DevelopmentBaseURLOverrideResult: Hashable, Sendable {
+        case applied(String)
+        case cleared
+        case rejected(String)
+    }
+
     @Published var selectedTab: RootTab = .library
     @Published private(set) var container: AppContainer
     @Published private(set) var pendingIncomingImportDraft: IncomingImportDraft?
@@ -22,10 +28,23 @@ final class AppState: ObservableObject {
         preferencesStore.developmentBaseURLOverride ?? ""
     }
 
-    func applyDevelopmentBaseURLOverride(_ rawValue: String) {
+    @discardableResult
+    func applyDevelopmentBaseURLOverride(_ rawValue: String) -> DevelopmentBaseURLOverrideResult {
         let trimmed = rawValue.trimmed
-        preferencesStore.developmentBaseURLOverride = trimmed.isEmpty ? nil : trimmed
+
+        if trimmed.isEmpty {
+            preferencesStore.developmentBaseURLOverride = nil
+            container = AppContainer.live(preferencesStore: preferencesStore)
+            return .cleared
+        }
+
+        if let issue = AppConfig.validationIssue(forBaseURLString: trimmed) {
+            return .rejected(issue)
+        }
+
+        preferencesStore.developmentBaseURLOverride = trimmed
         container = AppContainer.live(preferencesStore: preferencesStore)
+        return .applied(container.config.apiBaseURL.absoluteString)
     }
 
     func refreshPendingSharedImportIfAvailable() async {

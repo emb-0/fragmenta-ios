@@ -5,7 +5,7 @@ struct JournalCardModifier: ViewModifier {
         let shape = RoundedRectangle(cornerRadius: FragmentaRadius.hero, style: .continuous)
 
         content
-            .padding(FragmentaSpacing.large)
+            .padding(FragmentaSpacing.large - 2)
             .background(
                 shape
                     .fill(FragmentaColor.surfacePrimary)
@@ -37,7 +37,7 @@ struct SectionSurfaceModifier: ViewModifier {
         let shape = RoundedRectangle(cornerRadius: FragmentaRadius.large, style: .continuous)
 
         content
-            .padding(FragmentaSpacing.large)
+            .padding(FragmentaSpacing.large - 2)
             .background(
                 shape
                     .fill(FragmentaColor.surfaceSecondary)
@@ -101,8 +101,8 @@ struct FieldSurfaceModifier: ViewModifier {
         let shape = RoundedRectangle(cornerRadius: FragmentaRadius.medium, style: .continuous)
 
         content
-            .padding(.horizontal, FragmentaSpacing.medium)
-            .padding(.vertical, FragmentaSpacing.medium)
+            .padding(.horizontal, FragmentaSpacing.medium + 1)
+            .padding(.vertical, FragmentaSpacing.medium + 1)
             .background(
                 shape
                     .fill(FragmentaColor.surfaceSecondary.opacity(0.9))
@@ -175,7 +175,7 @@ struct PaperGlassCardModifier: ViewModifier {
         let shape = RoundedRectangle(cornerRadius: FragmentaRadius.hero, style: .continuous)
 
         content
-            .padding(FragmentaSpacing.large)
+            .padding(FragmentaSpacing.large - 2)
             .background(
                 shape
                     .fill(Color.clear)

@@ -55,7 +55,7 @@ struct APIError: Error, Codable, Hashable, LocalizedError, Sendable {
     }
 
     var category: Category {
-        if code == "offline" {
+        if ["offline", "host_not_found", "host_unreachable", "request_timed_out"].contains(code) {
             return .offline
         }
 
@@ -67,7 +67,7 @@ struct APIError: Error, Codable, Hashable, LocalizedError, Sendable {
             return .decoding
         }
 
-        if code == "invalid_url" {
+        if ["invalid_url", "invalid_base_url"].contains(code) {
             return .invalidRequest
         }
 
@@ -142,6 +142,16 @@ struct APIError: Error, Codable, Hashable, LocalizedError, Sendable {
         )
     }
 
+    static func invalidBaseURL(_ rawValue: String, issue: String) -> APIError {
+        APIError(
+            code: "invalid_base_url",
+            message: issue,
+            details: rawValue,
+            requestID: nil,
+            statusCode: nil
+        )
+    }
+
     static func cancelled() -> APIError {
         APIError(
             code: "cancelled",
@@ -152,10 +162,50 @@ struct APIError: Error, Codable, Hashable, LocalizedError, Sendable {
         )
     }
 
-    static func offline(_ error: URLError) -> APIError {
-        APIError(
+    static func offline(_ error: URLError, requestURL: URL?) -> APIError {
+        let host = requestURL?.host ?? "the backend"
+        let port = requestURL?.port.map { ":\($0)" } ?? ""
+
+        switch error.code {
+        case .cannotFindHost:
+            return APIError(
+                code: "host_not_found",
+                message: "Fragmenta couldn't resolve \(host). If you're testing on a device, use the Mac mini LAN IP or a production URL instead of localhost.",
+                details: error.localizedDescription,
+                requestID: nil,
+                statusCode: nil
+            )
+        case .cannotConnectToHost:
+            return APIError(
+                code: "host_unreachable",
+                message: "Fragmenta reached \(host)\(port), but nothing accepted the connection. Start fragmenta-core or correct the base URL.",
+                details: error.localizedDescription,
+                requestID: nil,
+                statusCode: nil
+            )
+        case .timedOut:
+            return APIError(
+                code: "request_timed_out",
+                message: "Fragmenta timed out while waiting for \(host). Check the backend, the network path, or the chosen base URL.",
+                details: error.localizedDescription,
+                requestID: nil,
+                statusCode: nil
+            )
+        case .notConnectedToInternet, .networkConnectionLost:
+            return APIError(
+                code: "offline",
+                message: "Fragmenta lost network access before it could reach \(host).",
+                details: error.localizedDescription,
+                requestID: nil,
+                statusCode: nil
+            )
+        default:
+            break
+        }
+
+        return APIError(
             code: "offline",
-            message: "Fragmenta couldn't reach the backend. Check your connection or base URL.",
+            message: "Fragmenta couldn't reach the backend at \(requestURL?.absoluteString ?? host).",
             details: error.localizedDescription,
             requestID: nil,
             statusCode: nil

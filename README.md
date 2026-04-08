@@ -57,8 +57,8 @@ Set these values in `Config/Local.xcconfig` for this Mac:
 
 - `DEVELOPMENT_TEAM = YOURTEAMID`
 - `PRODUCT_BUNDLE_IDENTIFIER = com.yourcompany.fragmenta`
-- `FRAGMENTA_SHARE_EXTENSION_BUNDLE_IDENTIFIER = $(PRODUCT_BUNDLE_IDENTIFIER).share`
-- `FRAGMENTA_APP_GROUP_IDENTIFIER = group.$(PRODUCT_BUNDLE_IDENTIFIER).shared`
+- `FRAGMENTA_SHARE_EXTENSION_BUNDLE_IDENTIFIER = com.yourcompany.fragmenta.share`
+- `FRAGMENTA_APP_GROUP_IDENTIFIER = group.com.yourcompany.fragmenta.shared`
 - `FRAGMENTA_API_BASE_URL = http:$(FORWARD_SLASH)$(FORWARD_SLASH)127.0.0.1:3000`
 
 Notes:
@@ -66,7 +66,7 @@ Notes:
 - `Config/Debug.xcconfig` defaults to local backend on the same Mac via `127.0.0.1:3000`.
 - `Config/Release.xcconfig` defaults to `https://fragmenta-core.example.com` and should be overridden for real release testing.
 - `Config/Local.xcconfig` is included last, so your local values override the repo defaults cleanly.
-- `FRAGMENTA_SHARE_EXTENSION_BUNDLE_IDENTIFIER` and `FRAGMENTA_APP_GROUP_IDENTIFIER` can stay derived from `PRODUCT_BUNDLE_IDENTIFIER` if you prefer that convention.
+- keep the app bundle ID, extension bundle ID, and App Group aligned manually so both targets expand to the same shared container value
 
 ## API base URL guidance
 

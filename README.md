@@ -43,8 +43,9 @@ Sprint 6 also ends on:
 - upstream: `origin/main`
 - remote: `git@github.com:emb-0/fragmenta-ios.git`
 - push target: `origin main`
-
-Update this section with the final Sprint 6 commit hash after pushing if you want the README itself to be a permanent release ledger.
+- pushed Sprint 6 head: `99c0957`
+- Sprint 6 feature commit: `3c4c1f5`
+- Sprint 6 handoff commit: `99c0957`
 
 ## Important tree changes
 
